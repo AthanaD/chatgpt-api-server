@@ -3,7 +3,6 @@ package websocket
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -30,6 +29,16 @@ func StartWebSocket(ctx context.Context) {
 }
 
 func WsPage(r *ghttp.Request) {
+	isAdmin := r.Session.MustGet("isAdmin").Bool()
+	if !isAdmin {
+
+		r.Response.Status = 401
+		r.Response.WriteJson(g.Map{
+			"detail": "Authentication credentials were not provided.",
+		})
+		return
+
+	}
 	conn, err := upGrader.Upgrade(r.Response.ResponseWriter, r.Request, nil)
 	if err != nil {
 		return
@@ -47,14 +56,14 @@ func init() {
 	StartWebSocket(ctx)
 	s := g.Server()
 	s.BindHandler("/socket", WsPage)
-	go func() {
-		// 每秒向所有客户端发送一次 hello
-		for {
-			clientManager.Broadcast <- &WResponse{
-				Event: "hello",
-				Data:  gtime.Now().String(),
-			}
-			time.Sleep(time.Second)
-		}
-	}()
+	// go func() {
+	// 	// 每秒向所有客户端发送一次 hello
+	// 	for {
+	// 		clientManager.Broadcast <- &WResponse{
+	// 			Event: "hello",
+	// 			Data:  gtime.Now().String(),
+	// 		}
+	// 		time.Sleep(time.Second)
+	// 	}
+	// }()
 }

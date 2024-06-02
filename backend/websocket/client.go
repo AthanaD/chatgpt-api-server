@@ -2,10 +2,13 @@ package websocket
 
 import (
 	"fmt"
+	"runtime/debug"
+
 	"github.com/gogf/gf/v2/container/garray"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gctx"
 	"github.com/gogf/gf/v2/util/guid"
 	"github.com/gorilla/websocket"
-	"runtime/debug"
 )
 
 const (
@@ -56,6 +59,7 @@ func NewClient(addr string, socket *websocket.Conn, firstTime uint64) (client *C
 
 // 读取客户端数据
 func (c *Client) read() {
+	ctx := gctx.New()
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("write stop", string(debug.Stack()), r)
@@ -72,7 +76,8 @@ func (c *Client) read() {
 			return
 		}
 		// 处理程序
-		fmt.Println(message)
+		// fmt.Println(message)
+		g.Log().Debug(ctx, "websocket read", string(message))
 		ProcessData(c, message)
 	}
 }

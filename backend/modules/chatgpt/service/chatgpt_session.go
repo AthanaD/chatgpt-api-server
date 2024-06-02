@@ -10,6 +10,7 @@ import (
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gctx"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
@@ -81,49 +82,84 @@ func (s *ChatgptSessionService) ModifyAfter(ctx g.Ctx, method string, param map[
 	return
 }
 
-// // GetSessionByUserToken 根据userToken获取session
-// func (s *ChatgptSessionService) GetSessionByUserToken(ctx g.Ctx, userToken string, conversationId string, isPlusModel bool) (record gdb.Record, code int, err error) {
-// 	if conversationId != "" {
-// 		rec, err := cool.DBM(model.NewChatgptConversation()).Where(g.Map{
-// 			"conversationId": conversationId,
-// 			"userToken":      userToken,
-// 		}).One()
-// 		if err != nil {
-// 			return nil, 500, err
-// 		}
-// 		if rec.IsEmpty() {
-// 			return nil, 404, nil
-// 		}
-// 		email := rec["email"].String()
-// 		record, err = cool.DBM(s.Model).Where("email=?", email).One()
-// 		if err != nil {
-// 			return nil, 500, err
-// 		}
-// 		if record.IsEmpty() {
-// 			return nil, 404, nil
-// 		}
-// 		return record, 200, err
-// 	}
-// 	// officalSession不为空
-// 	m := cool.DBM(s.Model).Where("status=1").Where("officialSession != ''")
-// 	g.Log().Debug(ctx, "ChatgptSessionService.GetSessionByUserToken", "isPlusModel", isPlusModel)
-// 	if isPlusModel {
-// 		m = m.Where("isPlus", 1)
-// 	} else {
-// 		m = m.Where("isPlus", 0)
-// 	}
-// 	record, err = m.OrderRandom().One()
-// 	if err != nil {
-// 		return nil, 500, err
-// 	}
-// 	if record.IsEmpty() {
-// 		err = gerror.New("无可用session")
+// AddSession 获取session并更新状态
+func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string) error {
+	ctxid := gctx.CtxId(ctx)
+	// 先检查是否已经存在
+	count, err := cool.DBM(s.Model).Where("email=?", username).Count()
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return gerror.New("账号已存在")
+	}
+	// g.Log().Info(ctx, "AddSession", "username", username, "password", password)
+	loginurl := config.CHATPROXY + "/applelogin"
+	// g.Log().Debug(ctx, "ChatgptSessionService.AddSession", loginurl)
+	sessionVar := g.Client().PostVar(ctx, loginurl, g.Map{
+		"username": username,
+		"password": password,
+	})
+	sessionJson := gjson.New(sessionVar)
+	// g.Dump(sessionVar)
+	if sessionJson.Get("accessToken").String() == "" {
+		g.Log().Error(ctx, "ChatgptSessionService.ModifyAfter", "get session error", sessionVar)
+		detail := sessionJson.Get("detail").String()
+		if detail != "" {
+			err := gerror.New(detail)
+			cool.DBM(s.Model).Data(g.Map{
+				"email":           username,
+				"officialSession": sessionJson.String(),
+				"status":          0,
+			}).Insert()
+			return err
+		} else {
+			return gerror.New("get session error")
+		}
+	}
+	var isPlus int
+	plan_type := sessionJson.Get("accountCheckInfo.plan_type").String()
+	if plan_type == "plus" || plan_type == "team" {
+		isPlus = 1
+	} else {
+		isPlus = 0
 
-// 		return nil, 501, err
-// 	}
+	}
+	_, err = cool.DBM(s.Model).Insert(g.Map{
+		"email":           username,
+		"password":        password,
+		"officialSession": sessionJson.String(),
+		"isPlus":          isPlus,
+		"status":          1,
+		"remark":          ctxid + "|批量添加",
+	})
+	if err != nil {
+		return err
+	}
+	// 写入缓存及set
+	RefreshToken := sessionJson.Get("refresh_token").String()
 
-// 	return record, 200, err
-// }
+	cacheSession := &config.CacheSession{
+		Email:        username,
+		AccessToken:  sessionJson.Get("accessToken").String(),
+		IsPlus:       isPlus,
+		RefreshToken: RefreshToken,
+	}
+	cool.CacheManager.Set(ctx, "session:"+username, cacheSession, time.Hour*24*10)
+	// 添加到set
+	if isPlus == 1 {
+		config.PlusSet.Add(username)
+	} else {
+		config.NormalSet.Add(username)
+	}
+	accounts_info := sessionJson.Get("accounts_info").String()
+	teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
+	for _, v := range teamIds {
+		config.PlusSet.Add(username + "|" + v)
+	}
+	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
+	return nil
+}
 
 func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map, refreshToken string) error {
 	getSessionUrl := config.CHATPROXY + "/applelogin"
@@ -134,6 +170,7 @@ func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map
 		"refresh_token": refreshToken,
 	})
 	sessionJson := gjson.New(sessionVar)
+	g.Dump(sessionJson)
 	if sessionJson.Get("accessToken").String() == "" {
 		g.Log().Error(ctx, "ChatgptSessionService.ModifyAfter", "get session error", sessionJson)
 		detail := sessionJson.Get("detail").String()
@@ -159,8 +196,7 @@ func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map
 	plan_type := sessionJson.Get("accountCheckInfo.plan_type").String()
 	if plan_type == "plus" || plan_type == "team" {
 		isPlus = 1
-	}
-	if plan_type == "free" {
+	} else {
 		isPlus = 0
 
 	}

@@ -25,16 +25,16 @@ func ProxyArkose(r *ghttp.Request) {
 	ctx := r.GetCtx()
 	path := r.RequestURI
 	// g.Log().Info(ctx, "ProxyArkose", path)
-	// isAdmin := r.Session.MustGet("isAdmin").Bool()
-	// if !isAdmin {
+	isAdmin := r.Session.MustGet("isAdmin").Bool()
+	if !isAdmin {
 
-	// 		r.Response.Status = 401
-	// 		r.Response.WriteJson(g.Map{
-	// 			"detail": "Authentication credentials were not provided.",
-	// 		})
-	// 		return
+		r.Response.Status = 401
+		r.Response.WriteJson(g.Map{
+			"detail": "Authentication credentials were not provided.",
+		})
+		return
 
-	// }
+	}
 
 	newreq := r.Request.Clone(ctx)
 	newreq.URL.Host = Remote.Host
