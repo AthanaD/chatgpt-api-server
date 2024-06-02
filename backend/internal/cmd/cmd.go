@@ -18,7 +18,6 @@ var (
 			if cool.IsRedisMode {
 				go cool.ListenFunc(ctx)
 			}
-
 			s := g.Server()
 			if config.PORT(ctx) != 0 {
 				s.SetPort(config.PORT(ctx))
