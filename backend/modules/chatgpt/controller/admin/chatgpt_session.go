@@ -14,7 +14,7 @@ type ChatgptSessionController struct {
 type AddBulkReq struct {
 	g.Meta        `path:"/addbulk" method:"POST"`
 	Authorization string `json:"Authorization" in:"header"`
-	Accouts       string `json:"accouts" in:"body"`
+	Accouts       string `jv:"required#账号密码不能为空" json:"accouts" in:"body"`
 }
 
 func (c *ChatgptSessionController) Move(ctx context.Context, req *AddBulkReq) (res *cool.BaseRes, err error) {
