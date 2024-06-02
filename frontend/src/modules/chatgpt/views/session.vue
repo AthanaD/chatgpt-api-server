@@ -57,6 +57,7 @@
 		@close="closeSocket"
 		:destroy-on-close="true"
 		:close-on-click-modal="false"
+		:fullscreen="true"
 	>
 		<div id="terminal"></div>
 	</cl-dialog>
@@ -374,6 +375,12 @@ export default defineComponent({
 			}
 
 			this.socketData["term"] = new Terminal({
+				// rendererType: "canvas",
+				// fontFamily: "",
+				fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+				fontWeight: "none",
+				fontSize: 14,
+				// letterSpacing: 3,
 				disableStdin: false
 			});
 			// 	{
@@ -391,15 +398,22 @@ export default defineComponent({
 			// 	}
 			// }
 			this.socketData["term"].open(document.getElementById("terminal"));
+			// this.socketData["term"].setOption("windowsMode", true);
 			let fitAddon = new FitAddon();
+
 			// this.socketData["term"].loadAddon(fitAddon);
 			fitAddon.activate(this.socketData["term"]);
-			window.onresize = function () {
-				// 窗口尺寸变化时，终端尺寸自适应
-				fitAddon.fit();
-			};
+			fitAddon.fit();
 			this.socketData["term"].write(`\r \n`);
 		}
 	}
 });
 </script>
+<style lang="scss" scoped>
+#terminal {
+	width: 100%;
+	// :deep .xterm-screen {
+	// 	width: 100% !important;
+	// }
+}
+</style>
