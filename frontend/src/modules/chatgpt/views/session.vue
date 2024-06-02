@@ -394,6 +394,10 @@ export default defineComponent({
 			let fitAddon = new FitAddon();
 			// this.socketData["term"].loadAddon(fitAddon);
 			fitAddon.activate(this.socketData["term"]);
+			window.onresize = function () {
+				// 窗口尺寸变化时，终端尺寸自适应
+				fitAddon.fit();
+			};
 			this.socketData["term"].write(`\r \n`);
 		}
 	}
