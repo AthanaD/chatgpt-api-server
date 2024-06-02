@@ -109,11 +109,22 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 			err := gerror.New(detail)
 			cool.DBM(s.Model).Data(g.Map{
 				"email":           username,
+				"password":        password,
 				"officialSession": sessionJson.String(),
 				"status":          0,
+				"isPlus":          0,
+				"remark":          ctxid + "|批量添加",
 			}).Insert()
 			return err
 		} else {
+			cool.DBM(s.Model).Data(g.Map{
+				"email":           username,
+				"password":        password,
+				"officialSession": "get session error",
+				"status":          0,
+				"isPlus":          0,
+				"remark":          ctxid + "|批量添加",
+			}).Insert()
 			return gerror.New("get session error")
 		}
 	}
