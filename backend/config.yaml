@@ -48,7 +48,7 @@ modules:
         enable: 1
       log:
         enable: 1
-CHATPROXY: "https://chatproxy-dev.closeai.biz"
+CHATPROXY: "https://chatproxy.xyhelper.cn"
 # 接入网关的authkey
 AUTHKEY: "xyhelper"
 

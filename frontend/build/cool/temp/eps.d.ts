@@ -728,6 +728,10 @@ declare namespace Eps {
 		 */
 		add(data?: any): Promise<any>;
 		/**
+		 * addbulk
+		 */
+		addbulk(data?: any): Promise<any>;
+		/**
 		 * delete
 		 */
 		delete(data?: any): Promise<any>;
@@ -756,6 +760,7 @@ declare namespace Eps {
 		 */
 		permission: {
 			add: string;
+			addbulk: string;
 			delete: string;
 			info: string;
 			list: string;
@@ -767,6 +772,7 @@ declare namespace Eps {
 		 */
 		_permission: {
 			add: boolean;
+			addbulk: boolean;
 			delete: boolean;
 			info: boolean;
 			list: boolean;
