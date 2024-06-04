@@ -91,7 +91,6 @@ func Completions(r *ghttp.Request) {
 	for _, message := range req.Messages {
 		fullQuestion += message.Content
 	}
-	// g.Dump(req)
 
 	// 如果不是plus用户但是使用了plus模型
 	if !isPlusUser && gstr.HasPrefix(realModel, "gpt-4") {

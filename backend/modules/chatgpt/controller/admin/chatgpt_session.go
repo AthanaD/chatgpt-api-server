@@ -25,7 +25,7 @@ type AddBulkReq struct {
 	Accounts      string `jv:"required#账号密码不能为空" json:"accounts" in:"body"`
 }
 type Account struct {
-	Username string `json:"username" v:"email"`
+	Username string `json:"username" v:"required"`
 	Password string `json:"password" v:"required"`
 }
 
