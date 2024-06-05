@@ -14,6 +14,7 @@
 				>查看日志</el-button
 			>
 			<cl-flex1 />
+			<cl-export-btn :columns="Table?.columns" />
 			<!-- 关键字搜索 -->
 			<cl-search-key />
 		</cl-row>

@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gctx"
+	"github.com/gogf/gf/v2/os/gtime"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
@@ -108,6 +109,8 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 		if detail != "" {
 			err := gerror.New(detail)
 			cool.DBM(s.Model).Data(g.Map{
+				"createTime":      gtime.Now().String(),
+				"updateTime":      gtime.Now().String(),
 				"email":           username,
 				"password":        password,
 				"officialSession": sessionJson.String(),
@@ -118,6 +121,8 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 			return err
 		} else {
 			cool.DBM(s.Model).Data(g.Map{
+				"createTime":      gtime.Now().String(),
+				"updateTime":      gtime.Now().String(),
 				"email":           username,
 				"password":        password,
 				"officialSession": "get session error",
@@ -136,14 +141,16 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 		isPlus = 0
 
 	}
-	_, err = cool.DBM(s.Model).Insert(g.Map{
+	_, err = cool.DBM(s.Model).Data(g.Map{
+		"createTime":      gtime.Now().String(),
+		"updateTime":      gtime.Now().String(),
 		"email":           username,
 		"password":        password,
 		"officialSession": sessionJson.String(),
 		"isPlus":          isPlus,
 		"status":          1,
 		"remark":          ctxid + "|批量添加",
-	})
+	}).Insert()
 	if err != nil {
 		return err
 	}
