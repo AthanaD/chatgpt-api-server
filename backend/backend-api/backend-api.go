@@ -128,6 +128,6 @@ func ProxyAll(r *ghttp.Request) {
 	newreq.Header.Set("Authorization", "Bearer "+accessToken)
 	newreq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36")
 	// g.Dump(newreq.URL)
-	proxy.ServeHTTP(r.Response.Writer.RawWriter(), newreq)
+	proxy.ServeHTTP(r.Response.RawWriter(), newreq)
 
 }

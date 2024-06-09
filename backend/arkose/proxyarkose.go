@@ -42,6 +42,6 @@ func ProxyArkose(r *ghttp.Request) {
 	newreq.Host = Remote.Host
 	g.Log().Info(ctx, "ProxyArkose", path, "--->", newreq.URL.String())
 
-	proxy.ServeHTTP(r.Response.Writer.RawWriter(), newreq)
+	proxy.ServeHTTP(r.Response.RawWriter(), newreq)
 
 }
