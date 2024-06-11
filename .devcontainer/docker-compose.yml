@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   mysql:
     image: mysql:8
@@ -47,3 +46,13 @@ services:
     network_mode: host
     # ports:
     #   - 3000:3000
+
+  chatgpt-next-web:
+    image: yidadaa/chatgpt-next-web
+    restart: always
+    environment:
+      OPENAI_API_KEY: "sk-9FXGokN3FlIhIBPK48Ba0041Ad164c0f93A9B7A3668990C7"
+      CODE: "xyhelper"
+      BASE_URL: "http://172.18.0.1:3000"
+    ports:
+      - 3001:3000

@@ -1,5 +1,7 @@
 package chat
 
+import "github.com/gogf/gf/v2/frame/g"
+
 var (
 	// client    = g.Client()
 	ErrNoAuth = `{
@@ -200,7 +202,7 @@ var (
 
 type Message struct {
 	Role    string `json:"role"`
-	Content string `json:"content"`
+	Content g.Var  `json:"content"`
 }
 
 type Req struct {

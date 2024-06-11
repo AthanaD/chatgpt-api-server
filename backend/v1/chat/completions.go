@@ -82,6 +82,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
+	// g.DumpJson(req)
 	reqModel := req.Model
 	realModel := config.GetModel(ctx, reqModel)
 	req.Model = realModel
@@ -89,9 +90,12 @@ func Completions(r *ghttp.Request) {
 	req.Stream = true
 	fullQuestion := ""
 	for _, message := range req.Messages {
-		fullQuestion += message.Content
-	}
+		if gjson.Valid(message.Content) {
+			continue
 
+		}
+		fullQuestion += message.Content.String()
+	}
 	// 如果不是plus用户但是使用了plus模型
 	if !isPlusUser && gstr.HasPrefix(realModel, "gpt-4") {
 		r.Response.Status = 400
@@ -117,35 +121,35 @@ func Completions(r *ghttp.Request) {
 	isPlusModel := gstr.HasPrefix(realModel, "gpt-4")
 	promptTokens := CountTokens(fullQuestion)
 
-	if isPlusModel {
-		if promptTokens > 32*1024 {
-			g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
-			r.Response.Status = 400
-			r.Response.WriteJson(g.Map{
-				"error": g.Map{
-					"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
-					"type":    "invalid_request_error",
-					"param":   nil,
-					"code":    "message_length_exceeds_limit",
-				},
-			})
-			return
-		}
-	} else {
-		if promptTokens > 8*1024 {
-			g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
-			r.Response.Status = 400
-			r.Response.WriteJson(g.Map{
-				"error": g.Map{
-					"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
-					"type":    "invalid_request_error",
-					"param":   nil,
-					"code":    "message_length_exceeds_limit",
-				},
-			})
-			return
-		}
-	}
+	// if isPlusModel {
+	// 	if promptTokens > 32*1024 {
+	// 		g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
+	// 		r.Response.Status = 400
+	// 		r.Response.WriteJson(g.Map{
+	// 			"error": g.Map{
+	// 				"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
+	// 				"type":    "invalid_request_error",
+	// 				"param":   nil,
+	// 				"code":    "message_length_exceeds_limit",
+	// 			},
+	// 		})
+	// 		return
+	// 	}
+	// } else {
+	// 	if promptTokens > 8*1024 {
+	// 		g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
+	// 		r.Response.Status = 400
+	// 		r.Response.WriteJson(g.Map{
+	// 			"error": g.Map{
+	// 				"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
+	// 				"type":    "invalid_request_error",
+	// 				"param":   nil,
+	// 				"code":    "message_length_exceeds_limit",
+	// 			},
+	// 		})
+	// 		return
+	// 	}
+	// }
 	if isPlusModel {
 		defer func() {
 			go func() {

@@ -221,10 +221,21 @@ func RefreshAllSession(ctx g.Ctx) {
 		accounts_info := officialSession.Get("accounts_info").String()
 
 		teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
+		// 关闭个人区记忆
+		g.Client().SetHeaderMap(g.MapStrStr{
+			"Authorization": "Bearer " + accessToken,
+			"Content-Type":  "application/json",
+		}).PatchVar(ctx, config.CHATPROXY+"/backend-api/settings/account_user_setting?feature=sunshine&value=false", g.Map{})
 		for _, v := range teamIds {
 			config.PlusSet.Add(email + "|" + v)
+			// 关闭团队区记忆
+			g.Client().SetHeaderMap(g.MapStrStr{
+				"Authorization":      "Bearer " + accessToken,
+				"Content-Type":       "application/json",
+				"Chatgpt-Account-Id": v,
+			}).PatchVar(ctx, config.CHATPROXY+"/backend-api/settings/account_user_setting?feature=sunshine&value=false", g.Map{})
 		}
 	}
 
-	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
+	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
 }
