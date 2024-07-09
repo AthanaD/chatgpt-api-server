@@ -220,7 +220,13 @@ func Completions(r *ghttp.Request) {
 		defer func() {
 			go func() {
 				if email != "" && isReturn {
+					if clears_in > 0 {
+						// 延迟归还
+						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到NormalSet")
+						time.Sleep(time.Duration(clears_in) * time.Second)
+					}
 					config.NormalSet.Add(email)
+					g.Log().Info(ctx, "归还", email, "到NormalSet")
 				}
 			}()
 		}()
@@ -295,6 +301,10 @@ func Completions(r *ghttp.Request) {
 	if resp.StatusCode == 429 {
 		resStr := resp.ReadAllString()
 		clears_in = gjson.New(resStr).Get("detail.clears_in").Int()
+		detail := gjson.New(resStr).Get("detail").String()
+		if detail == "You've reached our limit of messages per hour. Please try again later." {
+			clears_in = 3600
+		}
 		g.Log().Error(ctx, emailWithTeamId, "resp.StatusCode==429", resStr)
 		r.Response.Status = 500
 		r.Response.WriteJson(g.Map{
@@ -401,7 +411,7 @@ func Completions(r *ghttp.Request) {
 				// if err == io.EOF {
 				// 	break
 				// }
-				g.Log().Info(ctx, "释放资源")
+				// g.Log().Info(ctx, "释放资源")
 				break
 			}
 			text := event.Data()

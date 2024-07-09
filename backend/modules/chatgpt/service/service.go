@@ -4,6 +4,7 @@ import (
 	"backend/config"
 	"backend/modules/chatgpt/model"
 	"backend/utility"
+	"context"
 	"time"
 
 	"github.com/cool-team-official/cool-admin-go/cool"
@@ -17,6 +18,7 @@ import (
 func init() {
 	ctx := gctx.GetInitCtx()
 	go AddAllSession(ctx)
+	go RefreshAllSession(context.Background())
 	corn, err := gcron.AddSingleton(ctx, config.CRONINTERVAL(ctx), RefreshAllSession, "RefreshSession")
 	if err != nil {
 		panic(err)
@@ -26,6 +28,7 @@ func init() {
 
 // 启动时添加所有账号的session到缓存及set
 func AddAllSession(ctx g.Ctx) {
+
 	record, err := cool.DBM(model.NewChatgptSession()).OrderAsc("updateTime").Where("status=1").All()
 	if err != nil {
 		g.Log().Error(ctx, "AddAllSession", err)
@@ -129,29 +132,39 @@ func AddAllSession(ctx g.Ctx) {
 
 // RefreshAllSession 刷新所有session
 func RefreshAllSession(ctx g.Ctx) {
-	record, err := cool.DBM(model.NewChatgptSession()).OrderAsc("updateTime").All()
+	// if !gmlock.TryLock("RefreshAllSession") {
+	// 	g.Log().Info(ctx, "RefreshAllSession", "已有任务在执行")
+	// 	return
+	// }
+	// defer gmlock.Unlock("RefreshAllSession")
+	record, err := cool.DBM(model.NewChatgptSession()).OrderAsc("status").All()
 	if err != nil {
-		g.Log().Error(ctx, "AddAllSession", err)
+		g.Log().Error(ctx, "RefreshAllSession", err)
 		return
 	}
 	for _, v := range record {
+
 		email := v["email"].String()
 		password := v["password"].String()
 		isPlus := 0
 		status := 0
-
+		g.Log().Info(ctx, "RefreshAllSession", email, len(record))
 		officialSession := gjson.New(v["officialSession"])
 		refreshToken := officialSession.Get("refresh_token").String()
 		detail := officialSession.Get("detail").String()
 
 		getSessionUrl := config.CHATPROXY + "/auth/refresh"
 		if detail == "密码不正确!" || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
-			g.Log().Error(ctx, "AddAllSession", "账号异常,跳过刷新", email, detail)
+			g.Log().Error(ctx, "RefreshAllSession", "账号异常,跳过刷新", email, detail)
 			continue
 		}
 		if gstr.Contains(detail, "Unknown or invalid refresh token") {
-			g.Log().Error(ctx, "AddAllSession", "refreshToken过期,重新登录", email, detail)
+			g.Log().Error(ctx, "RefreshAllSession", "refreshToken过期,重新登录", email, detail)
 			refreshToken = ""
+			getSessionUrl = config.CHATPROXY + "/applelogin"
+		}
+		if refreshToken == "" {
+			g.Log().Error(ctx, "RefreshAllSession", "refreshToken为空,重新登录", email, detail)
 			getSessionUrl = config.CHATPROXY + "/applelogin"
 		}
 

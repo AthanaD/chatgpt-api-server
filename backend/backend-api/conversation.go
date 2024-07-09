@@ -513,7 +513,7 @@ func RefreshSession(email string) {
 	})
 	sessionJson = gjson.New(sessionVar)
 	detail := sessionJson.Get("detail").String()
-	if detail == "密码不正确!" || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
+	if gstr.Contains(detail, "密码") || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
 		g.Log().Error(ctx, "AddAllSession", email, detail)
 		cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
 			"officialSession": sessionJson.String(),

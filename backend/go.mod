@@ -13,7 +13,7 @@ require (
 	github.com/cool-team-official/cool-admin-go/modules/space v1.5.11
 	github.com/cool-team-official/cool-admin-go/modules/task v1.5.11
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
-	github.com/gogf/gf/v2 v2.7.1
+	github.com/gogf/gf/v2 v2.7.2
 	github.com/json-iterator/go v1.1.12
 	github.com/pkoukk/tiktoken-go v0.1.7
 )
@@ -24,7 +24,8 @@ require (
 	github.com/cool-team-official/cool-admin-go/contrib/drivers/pgsql v1.5.11 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
-	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.7.1 // indirect
+	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/gogf/gf/contrib/drivers/pgsql/v2 v2.7.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
@@ -37,7 +38,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.27.0 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
-	gorm.io/driver/postgres v1.5.7 // indirect
+	gorm.io/driver/postgres v1.5.9 // indirect
 )
 
 require (
@@ -51,11 +52,11 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/gogf/gf/contrib/drivers/mysql/v2 v2.7.1 // indirect
-	github.com/gogf/gf/contrib/nosql/redis/v2 v2.7.1
+	github.com/gogf/gf/contrib/drivers/mysql/v2 v2.7.2 // indirect
+	github.com/gogf/gf/contrib/nosql/redis/v2 v2.7.2
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/websocket v1.5.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/grokify/html-strip-tags-go v0.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -75,9 +76,9 @@ require (
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/mysql v1.5.6 // indirect
+	gorm.io/driver/mysql v1.5.7 // indirect
 	gorm.io/gorm v1.25.10 // indirect
-	modernc.org/libc v1.53.1 // indirect
+	modernc.org/libc v1.54.0 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
 	modernc.org/memory v1.8.0 // indirect
 	modernc.org/sqlite v1.30.1 // indirect
