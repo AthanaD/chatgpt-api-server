@@ -32,6 +32,7 @@ func Completions(r *ghttp.Request) {
 				"code":    nil,
 			},
 		})
+		return
 	}
 	isPlusUser := false
 	if !config.ISFREE(ctx) {
