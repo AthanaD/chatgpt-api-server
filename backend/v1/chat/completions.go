@@ -98,7 +98,7 @@ func Completions(r *ghttp.Request) {
 		fullQuestion += message.Content.String()
 	}
 	// 如果不是plus用户但是使用了plus模型
-	if !isPlusUser && gstr.HasPrefix(realModel, "gpt-4") {
+	if !isPlusUser && config.PlusModels.Contains(realModel) {
 		r.Response.Status = 400
 		r.Response.WriteJson(g.Map{
 			"error": g.Map{
@@ -119,7 +119,7 @@ func Completions(r *ghttp.Request) {
 	isPlusInvalid := false
 	// 是否归还
 	isReturn := true
-	isPlusModel := gstr.HasPrefix(realModel, "gpt-4")
+	isPlusModel := config.PlusModels.Contains(realModel)
 	promptTokens := CountTokens(fullQuestion)
 
 	// if isPlusModel {

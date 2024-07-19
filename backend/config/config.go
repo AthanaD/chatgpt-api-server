@@ -97,6 +97,7 @@ func init() {
 	FreeModels.Append("text-davinci-002-render-sha")
 	FreeModels.Append("text-davinci-002-render-sha-mobile")
 	FreeModels.Append("auto")
+	FreeModels.Append("gpt-4o-mini")
 	PlusModels.Append("gpt-4")
 	PlusModels.Append("gpt-4o")
 	PlusModels.Append("gpt-4-browsing")
