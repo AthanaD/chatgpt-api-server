@@ -4,6 +4,7 @@ import (
 	backendapi "backend/backend-api"
 	"backend/config"
 	"backend/modules/chatgpt/model"
+	"io"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
+	"github.com/gogf/gf/v2/os/gctx"
 	"github.com/gogf/gf/v2/text/gstr"
 	"github.com/gogf/gf/v2/util/gconv"
 	"github.com/launchdarkly/eventsource"
@@ -181,7 +183,7 @@ func Completions(r *ghttp.Request) {
 		}()
 		if email == "" {
 			emailWithTeamId, ok = config.PlusSet.Pop()
-			g.Log().Info(ctx, emailWithTeamId, ok)
+			// g.Log().Info(ctx, emailWithTeamId, ok)
 			if !ok {
 				g.Log().Error(ctx, "Get email from plusset error")
 				r.Response.Status = 429
@@ -221,13 +223,24 @@ func Completions(r *ghttp.Request) {
 		defer func() {
 			go func() {
 				if email != "" && isReturn {
+					ctx := gctx.New()
+					count, err := config.DayCountAdd(ctx, email)
+					if err != nil {
+						g.Log().Error(ctx, "DayCountAdd", err)
+					}
+					if config.MAX_REQUEST_PER_DAY > 0 && count > config.MAX_REQUEST_PER_DAY {
+						// 如果超过每日限制，今日不再归还
+						g.Log().Info(ctx, email, "超过每日限制", count)
+						clears_in = int(config.GetTodayLefeSecond(ctx))
+					}
+
 					if clears_in > 0 {
 						// 延迟归还
-						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到NormalSet")
+						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到NormalSet", count)
 						time.Sleep(time.Duration(clears_in) * time.Second)
 					}
 					config.NormalSet.Add(email)
-					g.Log().Info(ctx, "归还", email, "到NormalSet")
+					g.Log().Info(ctx, "归还", email, "到NormalSet", count)
 				}
 			}()
 		}()
@@ -247,7 +260,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream)
+	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size())
 
 	// 使用email获取 accessToken
 	sessionCache := &config.CacheSession{}
@@ -409,10 +422,11 @@ func Completions(r *ghttp.Request) {
 		for {
 			event, err := decoder.Decode()
 			if err != nil {
-				// if err == io.EOF {
-				// 	break
-				// }
+				if err == io.EOF {
+					break
+				}
 				// g.Log().Info(ctx, "释放资源")
+				g.Log().Error(ctx, email, "decoder.Decode() error: ", err)
 				break
 			}
 			text := event.Data()

@@ -28,15 +28,17 @@ func USERTOKENLOCK(ctx g.Ctx) bool {
 }
 
 var (
-	DefaultModel     = "auto"
-	FreeModels       = garray.NewStrArray()
-	PlusModels       = garray.NewStrArray()
-	NormalSet        = utility.NewSafeQueue()
-	PlusSet          = utility.NewSafeQueue()
-	Gpt_4o_Set       = utility.NewSafeQueue()
-	MAXTIME          = 0
-	TraceparentCache = gcache.New()
-	CHATPROXY        = ""
+	DefaultModel              = "auto"
+	FreeModels                = garray.NewStrArray()
+	PlusModels                = garray.NewStrArray()
+	NormalSet                 = utility.NewSafeQueue()
+	PlusSet                   = utility.NewSafeQueue()
+	Gpt_4o_Set                = utility.NewSafeQueue()
+	MAXTIME                   = 0
+	TraceparentCache          = gcache.New()
+	CHATPROXY                 = ""
+	Redis                     = g.Redis("cool")
+	MAX_REQUEST_PER_DAY int64 = 0
 )
 
 func PORT(ctx g.Ctx) int {
@@ -114,6 +116,11 @@ func init() {
 		panic("CHATPROXY is empty")
 	}
 	g.Log().Info(ctx, "CHATPROXY:", CHATPROXY)
+	maxRequestPerDay := g.Cfg().MustGetWithEnv(ctx, "MAX_REQUEST_PER_DAY").Int64()
+	if maxRequestPerDay > 0 {
+		MAX_REQUEST_PER_DAY = maxRequestPerDay
+	}
+	g.Log().Info(ctx, "MAX_REQUEST_PER_DAY:", MAX_REQUEST_PER_DAY)
 	modelmapStr, err := baseservice.NewBaseSysParamService().DataByKey(ctx, "modelmap")
 	if err != nil {
 		panic(err)
@@ -148,4 +155,29 @@ func GetModel(ctx g.Ctx, model string) string {
 		return v
 	}
 	return DefaultModel
+}
+
+func DayCountAdd(ctx g.Ctx, key string) (res int64, err error) {
+	// g.Log().Debug(ctx, "CountAdd", key, value)
+	redisKey := "daycount:" + utility.GetEsyncValue(ctx) + ":" + key
+
+	res, err = Redis.Incr(ctx, redisKey)
+	if err != nil {
+		g.Log().Error(ctx, "CountAdd", err)
+		return
+	}
+	// 设置key的过期时间
+	Redis.Expire(ctx, redisKey, 86400)
+	return
+}
+
+// GetTodayLefeSecond 获取今天剩余秒数
+func GetTodayLefeSecond(ctx g.Ctx) int64 {
+	now := time.Now()
+	// 获取当前时间的年月日
+	year, month, day := now.Date()
+	// 获取明天的时间
+	tomorrow := time.Date(year, month, day+1, 0, 0, 0, 0, now.Location())
+	// 获取当前时间到明天的时间差
+	return tomorrow.Unix() - now.Unix()
 }
