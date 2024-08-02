@@ -52,4 +52,4 @@ CHATPROXY: "https://chatproxy-dev.closeai.biz"
 # 接入网关的authkey
 AUTHKEY: "xyhelper"
 
-MAX_REQUEST_PER_DAY: 1
+MAX_REQUEST_PER_DAY: 500

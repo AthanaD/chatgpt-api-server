@@ -87,7 +87,11 @@ func Completions(r *ghttp.Request) {
 	}
 	// g.DumpJson(req)
 	reqModel := req.Model
-	realModel := config.GetModel(ctx, reqModel)
+	mapModel := config.GetModel(ctx, reqModel)
+	realModel := mapModel
+	if mapModel == "gpt-4o-lite" {
+		realModel = "gpt-4o"
+	}
 	req.Model = realModel
 	isStream := req.Stream
 	req.Stream = true
@@ -100,7 +104,7 @@ func Completions(r *ghttp.Request) {
 		fullQuestion += message.Content.String()
 	}
 	// 如果不是plus用户但是使用了plus模型
-	if !isPlusUser && config.PlusModels.Contains(realModel) {
+	if !isPlusUser && config.PlusModels.Contains(mapModel) {
 		r.Response.Status = 400
 		r.Response.WriteJson(g.Map{
 			"error": g.Map{
@@ -121,38 +125,8 @@ func Completions(r *ghttp.Request) {
 	isPlusInvalid := false
 	// 是否归还
 	isReturn := true
-	isPlusModel := config.PlusModels.Contains(realModel)
+	isPlusModel := config.PlusModels.Contains(mapModel)
 	promptTokens := CountTokens(fullQuestion)
-
-	// if isPlusModel {
-	// 	if promptTokens > 32*1024 {
-	// 		g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
-	// 		r.Response.Status = 400
-	// 		r.Response.WriteJson(g.Map{
-	// 			"error": g.Map{
-	// 				"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
-	// 				"type":    "invalid_request_error",
-	// 				"param":   nil,
-	// 				"code":    "message_length_exceeds_limit",
-	// 			},
-	// 		})
-	// 		return
-	// 	}
-	// } else {
-	// 	if promptTokens > 8*1024 {
-	// 		g.Log().Error(ctx, userToken, reqModel, realModel, promptTokens, "tokens too long")
-	// 		r.Response.Status = 400
-	// 		r.Response.WriteJson(g.Map{
-	// 			"error": g.Map{
-	// 				"message": "The message you submitted was too long," + gconv.String(promptTokens) + " tokens, please reload the conversation and submit something shorter.",
-	// 				"type":    "invalid_request_error",
-	// 				"param":   nil,
-	// 				"code":    "message_length_exceeds_limit",
-	// 			},
-	// 		})
-	// 		return
-	// 	}
-	// }
 	if isPlusModel {
 		defer func() {
 			go func() {
@@ -205,6 +179,47 @@ func Completions(r *ghttp.Request) {
 				email = emailWithTeamId
 			}
 		}
+	} else if mapModel == "gpt-4o-lite" {
+		emailWithTeamId, ok = config.Gpt4oLiteSet.Pop()
+		if !ok {
+			g.Log().Error(ctx, "Get email from set error")
+			r.Response.Status = 429
+			r.Response.WriteJson(g.Map{
+				"error": g.Map{
+					"message": "Server is busy, please try again later",
+					"type":    "invalid_request_error",
+					"param":   "normalset",
+					"code":    "server_busy",
+				},
+			})
+			return
+		}
+		defer func() {
+			go func() {
+				if email != "" && isReturn {
+					ctx := gctx.New()
+					count, err := config.DayCountAdd(ctx, email)
+					if err != nil {
+						g.Log().Error(ctx, "DayCountAdd", err)
+					}
+					if config.MAX_REQUEST_PER_DAY > 0 && count > config.MAX_REQUEST_PER_DAY {
+						// 如果超过每日限制，今日不再归还
+						g.Log().Info(ctx, email, "超过每日限制", count)
+						clears_in = int(config.GetTodayLefeSecond(ctx))
+					}
+
+					if clears_in > 0 {
+						// 延迟归还
+						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到Gpt4oLiteSet", count)
+						time.Sleep(time.Duration(clears_in) * time.Second)
+					}
+					config.Gpt4oLiteSet.Add(email)
+					g.Log().Info(ctx, "归还", email, "到Gpt4oLiteSett", count)
+				}
+			}()
+		}()
+
+		email = emailWithTeamId
 	} else {
 		emailWithTeamId, ok = config.NormalSet.Pop()
 		if !ok {
@@ -260,7 +275,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size())
+	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size())
 
 	// 使用email获取 accessToken
 	sessionCache := &config.CacheSession{}
@@ -318,6 +333,9 @@ func Completions(r *ghttp.Request) {
 		detail := gjson.New(resStr).Get("detail").String()
 		if detail == "You've reached our limit of messages per hour. Please try again later." {
 			clears_in = 3600
+		}
+		if detail == "You've hit your monthly limit. Please try again later." && mapModel == "gpt-4o-lite" {
+			clears_in = 3600 * 24
 		}
 		g.Log().Error(ctx, emailWithTeamId, "resp.StatusCode==429", resStr)
 		r.Response.Status = 500
@@ -389,6 +407,16 @@ func Completions(r *ghttp.Request) {
 			})
 			return
 		}
+		r.Response.Status = 500
+		r.Response.WriteJson(g.Map{
+			"error": g.Map{
+				"message": detail,
+				"type":    "server_error",
+				"param":   nil,
+				"code":    "server_error",
+			},
+		})
+		return
 	}
 	// 如果返回结果不是200
 	if resp.StatusCode != 200 {
@@ -471,12 +499,14 @@ func Completions(r *ghttp.Request) {
 			r.Response.WriteJson(apiNonStreamResp)
 		}
 
-		if realModel != "text-davinci-002-render-sha" && realModel != "auto" && modelSlug == "text-davinci-002-render-sha" {
-			isPlusInvalid = true
-			g.Log().Info(ctx, userToken, "使用", emailWithTeamId, realModel, "->", modelSlug, "PLUS失效")
-		} else {
-			g.Log().Info(ctx, userToken, "使用", emailWithTeamId, realModel, "->", modelSlug, "完成会话")
-		}
+		// if realModel != "text-davinci-002-render-sha" && realModel != "auto" && modelSlug == "text-davinci-002-render-sha" {
+		// 	isPlusInvalid = true
+		// 	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, realModel, "->", modelSlug, "PLUS失效")
+		// } else {
+		// 	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, realModel, "->", modelSlug, "完成会话")
+		// }
+		g.Log().Info(ctx, userToken, "使用", emailWithTeamId, realModel, "->", modelSlug, "完成会话")
+
 		r.ExitAll()
 		return
 	}

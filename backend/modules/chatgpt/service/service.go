@@ -112,9 +112,11 @@ func AddAllSession(ctx g.Ctx) {
 		if isPlus == 1 {
 			config.PlusSet.Add(email)
 			config.NormalSet.Remove(email)
+			config.Gpt4oLiteSet.Remove(email)
 
 		} else {
 			config.NormalSet.Add(email)
+			config.Gpt4oLiteSet.Add(email)
 			config.PlusSet.Remove(email)
 
 		}
@@ -126,7 +128,7 @@ func AddAllSession(ctx g.Ctx) {
 		}
 	}
 
-	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
+	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size())
 
 }
 
@@ -225,9 +227,11 @@ func RefreshAllSession(ctx g.Ctx) {
 		if isPlus == 1 {
 			config.PlusSet.Add(email)
 			config.NormalSet.Remove(email)
+			config.Gpt4oLiteSet.Remove(email)
 
 		} else {
 			config.NormalSet.Add(email)
+			config.Gpt4oLiteSet.Add(email)
 			config.PlusSet.Remove(email)
 
 		}
@@ -250,5 +254,5 @@ func RefreshAllSession(ctx g.Ctx) {
 		}
 	}
 
-	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
+	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size())
 }

@@ -169,6 +169,7 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 		config.PlusSet.Add(username)
 	} else {
 		config.NormalSet.Add(username)
+		config.Gpt4oLiteSet.Add(username)
 	}
 	accounts_info := sessionJson.Get("accounts_info").String()
 	teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
@@ -237,9 +238,11 @@ func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map
 	if isPlus == 1 {
 		config.PlusSet.Add(email)
 		config.NormalSet.Remove(email)
+		config.Gpt4oLiteSet.Remove(email)
 
 	} else {
 		config.NormalSet.Add(email)
+		config.Gpt4oLiteSet.Add(email)
 		config.PlusSet.Remove(email)
 	}
 	accounts_info := sessionJson.Get("accounts_info").String()
