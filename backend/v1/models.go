@@ -56,6 +56,12 @@ func Models(r *ghttp.Request) {
 			Created: gtime.Now().Timestamp(),
 		})
 	}
+	models = append(models, OpenAIModel{
+		ID:      "gpt-4-gizmo-*",
+		Object:  "model",
+		Created: gtime.Now().Timestamp(),
+	})
+
 	r.Response.WriteJsonExit(OpenAIModelsResponse{
 		Data:    models,
 		Success: true,

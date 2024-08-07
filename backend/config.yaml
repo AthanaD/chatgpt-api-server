@@ -53,3 +53,11 @@ CHATPROXY: "https://chatproxy-dev.closeai.biz"
 AUTHKEY: "xyhelper"
 
 MAX_REQUEST_PER_DAY: 500
+
+
+
+# 内容审核使用的OPENAIKEY
+OAIKEY: ""
+
+# 保留历史聊天记录 默认为false
+KEEP_CHAT_HISTORY: true

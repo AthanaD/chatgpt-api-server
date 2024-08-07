@@ -38,10 +38,9 @@ func Completions(r *ghttp.Request) {
 	}
 	isPlusUser := false
 	if !config.ISFREE(ctx) {
-		userRecord, err := cool.DBM(model.NewChatgptUser()).Where("userToken", userToken).Where("expireTime>now()").Cache(gdb.CacheOption{
+		userRecord, err := g.DB().Model("chatgpt_user").Where("userToken", userToken).Where("expireTime>now()").Cache(gdb.CacheOption{
 			Duration: 10 * time.Minute,
-			Name:     "userToken:" + userToken,
-			Force:    true,
+			Name:     "userToken-" + userToken,
 		}).One()
 		if err != nil {
 			g.Log().Error(ctx, err)
@@ -87,21 +86,28 @@ func Completions(r *ghttp.Request) {
 	}
 	// g.DumpJson(req)
 	reqModel := req.Model
-	mapModel := config.GetModel(ctx, reqModel)
-	realModel := mapModel
-	if mapModel == "gpt-4o-lite" {
-		realModel = "gpt-4o"
+	gizmoId := ""
+	if gstr.HasPrefix(reqModel, "gpt-4-gizmo-") {
+		gizmoId = gstr.SubStr(reqModel, 12)
 	}
+	mapModel := config.GetModel(ctx, reqModel, isPlusUser)
+	realModel := mapModel
+	// if mapModel == "gpt-4o-lite" {
+	// 	realModel = "gpt-4o"
+	// }
 	req.Model = realModel
 	isStream := req.Stream
 	req.Stream = true
 	fullQuestion := ""
 	for _, message := range req.Messages {
 		if gjson.Valid(message.Content) {
+			// g.Log().Debug(ctx, "message.Content is  json", message.Content)
 			continue
 
+		} else {
+			fullQuestion += message.Content.String() + "\n"
+			// g.Log().Debug(ctx, "message.Content is not json", message.Content)
 		}
-		fullQuestion += message.Content.String()
 	}
 	// 如果不是plus用户但是使用了plus模型
 	if !isPlusUser && config.PlusModels.Contains(mapModel) {
@@ -275,8 +281,42 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size())
+	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "keepChatHisory:", config.KEEP_CHAT_HISTORY, "max_tokens:", req.MaxTokens, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size())
+	// OPENAI Moderation 检测
+	if config.OAIKEY != "" {
+		// 检测是否包含违规内容
+		respVar := g.Client().SetHeaderMap(g.MapStrStr{
+			"Authorization": "Bearer " + config.OAIKEY,
+			"Content-Type":  "application/json",
+		}).PostVar(ctx, config.MODERATION, g.Map{
+			"input": fullQuestion,
+		})
 
+		// 返回的 json 中 results.flagged 为 true 时为违规内容
+		// respBody := resp.ReadAllString()
+		//g.Log().Debug(ctx, "resp:", respBody)
+		// g.Dump(respVar)
+		respJson := gjson.New(respVar)
+		errorMessage := respJson.Get("error.message").String()
+		if errorMessage != "" {
+			g.Log().Error(ctx, "请求openai Moderation error: ", errorMessage)
+		}
+		isFlagged := respJson.Get("results.0.flagged").Bool()
+		if isFlagged {
+			g.Log().Error(ctx, userToken, "检测到违规内容:", isFlagged, fullQuestion, respVar)
+			// 违规内容返回 400
+			r.Response.Status = 400
+			r.Response.WriteJson(g.Map{
+				"error": g.Map{
+					"message": "Your message was flagged as inappropriate. Please try again with a different prompt.",
+					"type":    "invalid_request_error",
+					"param":   nil,
+					"code":    "inappropriate_content",
+				},
+			})
+			return
+		}
+	}
 	// 使用email获取 accessToken
 	sessionCache := &config.CacheSession{}
 	cool.CacheManager.MustGet(ctx, "session:"+email).Scan(&sessionCache)
@@ -284,12 +324,18 @@ func Completions(r *ghttp.Request) {
 	// ChatReq.Dump()
 	// 请求openai
 	reqHeader := g.MapStrStr{
-		"Authorization":     "Bearer " + sessionCache.RefreshToken,
+		"Authorization":     "Bearer " + sessionCache.AccessToken,
 		"Content-Type":      "application/json",
 		"Replay-Real-Model": "true",
 	}
 	if teamId != "" {
 		reqHeader["ChatGPT-Account-ID"] = teamId
+	}
+	if gizmoId != "" {
+		reqHeader["Gizmo-Id"] = gizmoId
+	}
+	if config.KEEP_CHAT_HISTORY {
+		reqHeader["Keep-Chat-History"] = "true"
 	}
 	resp, err := g.Client().SetHeaderMap(reqHeader).Post(ctx, config.CHATPROXY+"/v1/chat/completions", req)
 	if err != nil {

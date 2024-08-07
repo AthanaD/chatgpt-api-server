@@ -11,6 +11,7 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcache"
 	"github.com/gogf/gf/v2/os/gctx"
+	"github.com/gogf/gf/v2/text/gstr"
 	"github.com/gogf/gf/v2/util/gconv"
 )
 
@@ -40,6 +41,10 @@ var (
 	CHATPROXY                 = ""
 	Redis                     = g.Redis("cool")
 	MAX_REQUEST_PER_DAY int64 = 0
+	MODERATION                = "https://gateway.ai.cloudflare.com/v1/a8cace244ffbc233655fefeaca37d515/xyhelper/openai/moderations"
+	OAIKEY                    = ""
+	OAIKEYLOG                 = "" // OAIKEYLOG 隐藏
+	KEEP_CHAT_HISTORY         = false
 )
 
 func PORT(ctx g.Ctx) int {
@@ -122,6 +127,25 @@ func init() {
 		MAX_REQUEST_PER_DAY = maxRequestPerDay
 	}
 	g.Log().Info(ctx, "MAX_REQUEST_PER_DAY:", MAX_REQUEST_PER_DAY)
+
+	oaikey := g.Cfg().MustGetWithEnv(ctx, "OAIKEY").String()
+	// oaikey 不为空
+	if oaikey != "" {
+		OAIKEY = oaikey
+		// 日志隐藏 oaikey，有 * 代表有值
+		OAIKEYLOG = "******"
+	}
+	g.Log().Info(ctx, "OAIKEY:", OAIKEYLOG)
+	moderation := g.Cfg().MustGetWithEnv(ctx, "MODERATION").String()
+	if moderation != "" {
+		MODERATION = moderation
+	}
+	g.Log().Info(ctx, "MODERATION:", MODERATION)
+	keepChatHistory := g.Cfg().MustGetWithEnv(ctx, "KEEP_CHAT_HISTORY").Bool()
+	if keepChatHistory {
+		KEEP_CHAT_HISTORY = keepChatHistory
+	}
+	g.Log().Info(ctx, "KEEP_CHAT_HISTORY:", KEEP_CHAT_HISTORY)
 	modelmapStr, err := baseservice.NewBaseSysParamService().DataByKey(ctx, "modelmap")
 	if err != nil {
 		panic(err)
@@ -142,7 +166,7 @@ func GenerateID(length int) string {
 	return id
 }
 
-func GetModel(ctx g.Ctx, model string) string {
+func GetModel(ctx g.Ctx, model string, isPlusUser bool) string {
 	// g.Log().Debug(ctx, "GetModel", model)
 	modelMapStr, err := baseservice.NewBaseSysParamService().DataByKey(ctx, "modelmap")
 	if err != nil {
@@ -154,6 +178,18 @@ func GetModel(ctx g.Ctx, model string) string {
 	// g.Dump(modelMap)
 	if v, ok := modelMap[model]; ok {
 		return v
+	}
+	if gstr.HasPrefix(model, "gpt-4-gizmo-") {
+		if v, ok := modelMap["gpt-4-gizmo-*"]; ok {
+			return v
+		} else {
+			if isPlusUser {
+				return "gpt-4o"
+			} else {
+				return "gpt-4o-lite"
+			}
+
+		}
 	}
 	return DefaultModel
 }

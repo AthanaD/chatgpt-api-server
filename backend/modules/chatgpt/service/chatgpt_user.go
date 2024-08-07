@@ -45,6 +45,31 @@ func NewChatgptUserService() *ChatgptUserService {
 	}
 }
 
+// MofifyBefore 新增/删除/修改之后的操作
+func (s *ChatgptUserService) ModifyAfter(ctx g.Ctx, method string, param map[string]interface{}) (err error) {
+	g.Log().Debug(ctx, "ChatgptUserService.ModifyAfter", method, param)
+
+	// g.Dump(idsJson)
+	// 如果是删除，就删除缓存及set
+	userToken := gconv.String(param["userToken"])
+	if userToken != "" {
+		g.Log().Debug(ctx, "ChatgptUserService.ModifyAfter", userToken)
+		// keyStrings, err := g.DB().GetCache().KeyStrings(ctx)
+		// if err != nil {
+		// 	g.Log().Error(ctx, "ChatgptUserService.ModifyAfter", err)
+		// 	return nil
+		// }
+		// g.DumpJson(keyStrings)
+		lastVar, err := g.DB().GetCache().Remove(ctx, "SelectCache:userToken-"+userToken)
+		if err != nil {
+			g.Log().Error(ctx, "ChatgptUserService.ModifyAfter", err)
+		}
+		g.Log().Debug(ctx, "ChatgptUserService.ModifyAfter lastVar", lastVar)
+
+	}
+	return
+}
+
 // // GetSessionPair 获取session pair
 // func (s *ChatgptUserService) GetSessionPair(ctx g.Ctx, userToken string, conversationId string, isPlusModel bool) (sessionPair *SessionPair, code int, err error) {
 
