@@ -4,6 +4,7 @@ import (
 	backendapi "backend/backend-api"
 	"backend/config"
 	"backend/modules/chatgpt/model"
+	"backend/utility"
 	"io"
 	"strings"
 	"time"
@@ -133,6 +134,7 @@ func Completions(r *ghttp.Request) {
 	isReturn := true
 	isPlusModel := config.PlusModels.Contains(mapModel)
 	promptTokens := CountTokens(fullQuestion)
+	var safeQueue *utility.SafeQueue
 	if isPlusModel {
 		defer func() {
 			go func() {
@@ -186,15 +188,20 @@ func Completions(r *ghttp.Request) {
 			}
 		}
 	} else if mapModel == "gpt-4o-lite" {
-		emailWithTeamId, ok = config.Gpt4oLiteSet.Pop()
+		if gizmoId != "" {
+			safeQueue = config.NormalGptsSet
+		} else {
+			safeQueue = config.Gpt4oLiteSet
+		}
+		emailWithTeamId, ok = safeQueue.Pop()
 		if !ok {
-			g.Log().Error(ctx, "Get email from set error")
+			g.Log().Error(ctx, "Get email from set error", safeQueue.Name)
 			r.Response.Status = 429
 			r.Response.WriteJson(g.Map{
 				"error": g.Map{
 					"message": "Server is busy, please try again later",
 					"type":    "invalid_request_error",
-					"param":   "normalset",
+					"param":   safeQueue.Name,
 					"code":    "server_busy",
 				},
 			})
@@ -216,11 +223,11 @@ func Completions(r *ghttp.Request) {
 
 					if clears_in > 0 {
 						// 延迟归还
-						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到Gpt4oLiteSet", count)
+						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", email, "到", safeQueue.Name, count)
 						time.Sleep(time.Duration(clears_in) * time.Second)
 					}
-					config.Gpt4oLiteSet.Add(email)
-					g.Log().Info(ctx, "归还", email, "到Gpt4oLiteSett", count)
+					safeQueue.Add(email)
+					g.Log().Info(ctx, "归还", email, "到", safeQueue.Name, count)
 				}
 			}()
 		}()
@@ -281,7 +288,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, "发起会话", "isStream:", isStream, "keepChatHisory:", config.KEEP_CHAT_HISTORY, "max_tokens:", req.MaxTokens, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size())
+	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, gizmoId, "发起会话", "isStream:", isStream, "keepChatHisory:", config.KEEP_CHAT_HISTORY, "max_tokens:", req.MaxTokens, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size(), "NormalGptsPool:", config.NormalGptsSet.Size())
 	// OPENAI Moderation 检测
 	if config.OAIKEY != "" {
 		// 检测是否包含违规内容

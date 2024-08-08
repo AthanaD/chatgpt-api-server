@@ -543,31 +543,46 @@ func RefreshSession(email string) {
 		g.Log().Error(ctx, "RefreshSession", err)
 		return
 	}
-	RefreshToken := sessionJson.Get("refresh_token").String()
 
-	// 更新缓存
+	session, err := utility.ParseSession(sessionJson.String())
+	if err != nil {
+		g.Log().Error(ctx, "AddAllSession", email, err)
+		return
+
+	}
+	// g.Dump(session)
+
+	// 添加到缓存
 	cacheSession := &config.CacheSession{
 		Email:        email,
-		AccessToken:  sessionJson.Get("accessToken").String(),
-		IsPlus:       isPlus,
+		AccessToken:  session.AccessToken,
 		CooldownTime: 0,
-		RefreshToken: RefreshToken,
+		RefreshToken: session.RefreshToken,
+		PlanType:     session.PlanType,
 	}
-	cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
+	err = cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
 
-	// 更新set
-	if isPlus == 1 {
+	if err != nil {
+		g.Log().Error(ctx, "AddAllSession to cache ", email, err)
+		return
+	}
+	g.Log().Info(ctx, "AddAllSession to cache", email, "success")
+	if session.PlanType == "plus" || session.PlanType == "team" {
 		config.PlusSet.Add(email)
 		config.NormalSet.Remove(email)
-	} else {
-		config.NormalSet.Add(email)
-		config.PlusSet.Remove(email)
+		config.Gpt4oLiteSet.Remove(email)
+		config.NormalGptsSet.Remove(email)
+		for _, v := range session.TeamIds {
+			config.PlusSet.Add(email + "|" + v)
+		}
 	}
-	accounts_info := sessionJson.Get("accounts_info").String()
-
-	teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
-	for _, v := range teamIds {
-		config.PlusSet.Add(email + "|" + v)
+	if session.PlanType == "free" {
+		config.NormalSet.Add(email)
+		config.Gpt4oLiteSet.Add(email)
+		config.PlusSet.Remove(email)
+		if session.FreeWithGpts {
+			config.NormalGptsSet.Add(email)
+		}
 	}
 	g.Log().Info(ctx, "RefreshSession", result["email"], isPlus, "success")
 

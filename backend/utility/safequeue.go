@@ -6,12 +6,14 @@ type SafeQueue struct {
 	queue map[string]struct{}
 	order []string
 	mu    sync.Mutex
+	Name  string
 }
 
-func NewSafeQueue() *SafeQueue {
+func NewSafeQueue(name string) *SafeQueue {
 	return &SafeQueue{
 		queue: make(map[string]struct{}),
 		order: make([]string, 0),
+		Name:  name,
 	}
 }
 

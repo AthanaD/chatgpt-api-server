@@ -32,10 +32,11 @@ var (
 	DefaultModel              = "auto"
 	FreeModels                = garray.NewStrArray()
 	PlusModels                = garray.NewStrArray()
-	NormalSet                 = utility.NewSafeQueue()
-	PlusSet                   = utility.NewSafeQueue()
-	Gpt4oLiteSet              = utility.NewSafeQueue()
-	Gpt_4o_Set                = utility.NewSafeQueue()
+	NormalSet                 = utility.NewSafeQueue("NormalSet")
+	PlusSet                   = utility.NewSafeQueue("PlusSet")
+	Gpt4oLiteSet              = utility.NewSafeQueue("Gpt4oLiteSet")
+	NormalGptsSet             = utility.NewSafeQueue("NormalGptsSet")
+	Gpt_4o_Set                = utility.NewSafeQueue("Gpt_4o_Set")
 	MAXTIME                   = 0
 	TraceparentCache          = gcache.New()
 	CHATPROXY                 = ""
@@ -95,9 +96,9 @@ func CONTINUEMAX(ctx g.Ctx) int {
 type CacheSession struct {
 	Email        string `json:"email"`
 	AccessToken  string `json:"accessToken"`
-	IsPlus       int    `json:"isPlus"`
 	CooldownTime int64  `json:"cooldownTime"`
 	RefreshToken string `json:"refreshToken"`
+	PlanType     string `json:"planType"`
 }
 
 func init() {

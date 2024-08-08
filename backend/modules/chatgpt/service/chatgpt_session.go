@@ -154,27 +154,41 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 	if err != nil {
 		return err
 	}
-	// 写入缓存及set
-	RefreshToken := sessionJson.Get("refresh_token").String()
+	session, err := utility.ParseSession(sessionJson.String())
+	if err != nil {
+		g.Log().Error(ctx, "AddSession", username, err)
+		return err
+
+	}
+	// g.Dump(session)
+
+	// 添加到缓存
+	email := session.Email
 
 	cacheSession := &config.CacheSession{
-		Email:        username,
-		AccessToken:  sessionJson.Get("accessToken").String(),
-		IsPlus:       isPlus,
-		RefreshToken: RefreshToken,
+		Email:        email,
+		AccessToken:  session.AccessToken,
+		CooldownTime: 0,
+		RefreshToken: session.RefreshToken,
+		PlanType:     session.PlanType,
 	}
-	cool.CacheManager.Set(ctx, "session:"+username, cacheSession, time.Hour*24*10)
-	// 添加到set
-	if isPlus == 1 {
-		config.PlusSet.Add(username)
-	} else {
-		config.NormalSet.Add(username)
-		config.Gpt4oLiteSet.Add(username)
+	cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
+	if session.PlanType == "plus" || session.PlanType == "team" {
+		config.PlusSet.Add(email)
+		config.NormalSet.Remove(email)
+		config.Gpt4oLiteSet.Remove(email)
+		config.NormalGptsSet.Remove(email)
+		for _, v := range session.TeamIds {
+			config.PlusSet.Add(email + "|" + v)
+		}
 	}
-	accounts_info := sessionJson.Get("accounts_info").String()
-	teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
-	for _, v := range teamIds {
-		config.PlusSet.Add(username + "|" + v)
+	if session.PlanType == "free" {
+		config.NormalSet.Add(email)
+		config.Gpt4oLiteSet.Add(email)
+		config.PlusSet.Remove(email)
+		if session.FreeWithGpts {
+			config.NormalGptsSet.Add(email)
+		}
 	}
 	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
 	return nil
@@ -189,7 +203,7 @@ func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map
 		"refresh_token": refreshToken,
 	})
 	sessionJson := gjson.New(sessionVar)
-	g.Dump(sessionJson)
+	// g.Dump(sessionJson)
 	if sessionJson.Get("accessToken").String() == "" {
 		g.Log().Error(ctx, "ChatgptSessionService.ModifyAfter", "get session error", sessionJson)
 		detail := sessionJson.Get("detail").String()
@@ -219,39 +233,53 @@ func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map
 		isPlus = 0
 
 	}
-	RefreshToken := sessionJson.Get("refresh_token").String()
 	_, err := cool.DBM(s.Model).Where("email=?", param["email"]).Update(g.Map{
 		"officialSession": sessionJson.String(),
 		"isPlus":          isPlus,
 		"status":          1,
 	})
+	if err != nil {
+		g.Log().Error(ctx, "ChatgptSessionService.ModifyAfter", "update session error", err)
+		return err
+	}
 	// 写入缓存及set
-	email := param["email"].(string)
+	session, err := utility.ParseSession(sessionJson.String())
+	if err != nil {
+		g.Log().Error(ctx, "AddSession", param["email"], err)
+		return err
+
+	}
+	// g.Dump(session)
+
+	// 添加到缓存
+	email := session.Email
+
 	cacheSession := &config.CacheSession{
 		Email:        email,
-		AccessToken:  sessionJson.Get("accessToken").String(),
-		IsPlus:       isPlus,
-		RefreshToken: RefreshToken,
+		AccessToken:  session.AccessToken,
+		CooldownTime: 0,
+		RefreshToken: session.RefreshToken,
+		PlanType:     session.PlanType,
 	}
 	cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
-	// 添加到set
-	if isPlus == 1 {
+	if session.PlanType == "plus" || session.PlanType == "team" {
 		config.PlusSet.Add(email)
 		config.NormalSet.Remove(email)
 		config.Gpt4oLiteSet.Remove(email)
-
-	} else {
+		config.NormalGptsSet.Remove(email)
+		for _, v := range session.TeamIds {
+			config.PlusSet.Add(email + "|" + v)
+		}
+	}
+	if session.PlanType == "free" {
 		config.NormalSet.Add(email)
 		config.Gpt4oLiteSet.Add(email)
 		config.PlusSet.Remove(email)
+		if session.FreeWithGpts {
+			config.NormalGptsSet.Add(email)
+		}
 	}
-	accounts_info := sessionJson.Get("accounts_info").String()
-
-	teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
-	for _, v := range teamIds {
-		config.PlusSet.Add(email + "|" + v)
-	}
-	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
+	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size(), "NormalGptsSet", config.NormalGptsSet.Size())
 
 	return err
 }

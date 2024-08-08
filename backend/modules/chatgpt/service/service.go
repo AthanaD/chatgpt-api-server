@@ -4,7 +4,6 @@ import (
 	"backend/config"
 	"backend/modules/chatgpt/model"
 	"backend/utility"
-	"context"
 	"time"
 
 	"github.com/cool-team-official/cool-admin-go/cool"
@@ -12,13 +11,12 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcron"
 	"github.com/gogf/gf/v2/os/gctx"
-	"github.com/gogf/gf/v2/text/gstr"
 )
 
 func init() {
 	ctx := gctx.GetInitCtx()
 	go AddAllSession(ctx)
-	go RefreshAllSession(context.Background())
+	go RefreshAllSession(ctx)
 	corn, err := gcron.AddSingleton(ctx, config.CRONINTERVAL(ctx), RefreshAllSession, "RefreshSession")
 	if err != nil {
 		panic(err)
@@ -36,69 +34,22 @@ func AddAllSession(ctx g.Ctx) {
 	}
 	for _, v := range record {
 		email := v["email"].String()
-		password := v["password"].String()
-		isPlus := v["isPlus"].Int()
-		status := 1
 		officialSession := gjson.New(v["officialSession"])
-		accessToken := officialSession.Get("accessToken").String()
-		refreshToken := officialSession.Get("refresh_token").String()
-
-		plan_type := officialSession.Get("accountCheckInfo.plan_type").String()
-		if plan_type == "plus" || plan_type == "team" {
-			isPlus = 1
-		}
-		if plan_type == "free" {
-			isPlus = 0
+		session, err := utility.ParseSession(officialSession.String())
+		if err != nil {
+			g.Log().Error(ctx, "AddAllSession", email, err)
+			continue
 
 		}
-		g.Log().Info(ctx, "AddAllSession", email, "accessToken", accessToken, "refreshToken", refreshToken, "isPlus", isPlus, "status", status)
-
-		if refreshToken == "" {
-
-			getSessionUrl := config.CHATPROXY + "/applelogin"
-			sessionVar := g.Client().SetHeader("authkey", config.AUTHKEY(ctx)).PostVar(ctx, getSessionUrl, g.Map{
-				"username": email,
-				"password": password,
-			})
-			sessionJson := gjson.New(sessionVar)
-			accessToken = sessionJson.Get("accessToken").String()
-			refreshToken = sessionJson.Get("refresh_token").String()
-
-			if accessToken == "" {
-				g.Log().Error(ctx, "AddAllSession", email, "get session error", sessionJson)
-				detail := sessionJson.Get("detail").String()
-				if detail == "密码不正确!" || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
-					g.Log().Error(ctx, "AddAllSession", email, detail)
-					cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
-						"officialSession": sessionJson.String(),
-						"status":          0,
-					})
-				}
-				continue
-			}
-			plan_type = sessionJson.Get("accountCheckInfo.plan_type").String()
-			if plan_type == "plus" || plan_type == "team" {
-				isPlus = 1
-			}
-			if plan_type == "free" {
-				isPlus = 0
-
-			}
-			status = 1
-			cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
-				"officialSession": sessionJson.String(),
-				"isPlus":          isPlus,
-				"status":          status,
-			})
-		}
+		// g.Dump(session)
 
 		// 添加到缓存
 		cacheSession := &config.CacheSession{
 			Email:        email,
-			IsPlus:       isPlus,
-			AccessToken:  accessToken,
+			AccessToken:  session.AccessToken,
 			CooldownTime: 0,
-			RefreshToken: refreshToken,
+			RefreshToken: session.RefreshToken,
+			PlanType:     session.PlanType,
 		}
 		err = cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
 
@@ -107,28 +58,27 @@ func AddAllSession(ctx g.Ctx) {
 			continue
 		}
 		g.Log().Info(ctx, "AddAllSession to cache", email, "success")
-
-		// 添加到set
-		if isPlus == 1 {
+		if session.PlanType == "plus" || session.PlanType == "team" {
 			config.PlusSet.Add(email)
 			config.NormalSet.Remove(email)
 			config.Gpt4oLiteSet.Remove(email)
-
-		} else {
+			config.NormalGptsSet.Remove(email)
+			for _, v := range session.TeamIds {
+				config.PlusSet.Add(email + "|" + v)
+			}
+		}
+		if session.PlanType == "free" {
 			config.NormalSet.Add(email)
 			config.Gpt4oLiteSet.Add(email)
 			config.PlusSet.Remove(email)
-
+			if session.FreeWithGpts {
+				config.NormalGptsSet.Add(email)
+			}
 		}
-		accounts_info := officialSession.Get("accounts_info").String()
 
-		teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
-		for _, v := range teamIds {
-			config.PlusSet.Add(email + "|" + v)
-		}
 	}
 
-	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size())
+	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size(), "NormalGptsSet", config.NormalGptsSet.Size())
 
 }
 
@@ -148,111 +98,85 @@ func RefreshAllSession(ctx g.Ctx) {
 
 		email := v["email"].String()
 		password := v["password"].String()
-		isPlus := 0
-		status := 0
 		g.Log().Info(ctx, "RefreshAllSession", email, len(record))
 		officialSession := gjson.New(v["officialSession"])
-		refreshToken := officialSession.Get("refresh_token").String()
-		detail := officialSession.Get("detail").String()
-
+		session, err := utility.ParseSession(officialSession.String())
+		if err != nil {
+			g.Log().Error(ctx, "RefreshAllSession", email, err)
+			if session.Disabled {
+				g.Log().Error(ctx, "RefreshAllSession", email, "跳过刷新")
+				continue
+			}
+		}
 		getSessionUrl := config.CHATPROXY + "/auth/refresh"
-		if detail == "密码不正确!" || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
-			g.Log().Error(ctx, "RefreshAllSession", "账号异常,跳过刷新", email, detail)
-			continue
-		}
-		if gstr.Contains(detail, "Unknown or invalid refresh token") {
-			g.Log().Error(ctx, "RefreshAllSession", "refreshToken过期,重新登录", email, detail)
-			refreshToken = ""
+		if session.RefreshToken == "" {
 			getSessionUrl = config.CHATPROXY + "/applelogin"
 		}
-		if refreshToken == "" {
-			g.Log().Error(ctx, "RefreshAllSession", "refreshToken为空,重新登录", email, detail)
-			getSessionUrl = config.CHATPROXY + "/applelogin"
-		}
-
 		sessionVar := g.Client().PostVar(ctx, getSessionUrl, g.Map{
 			"username":      email,
 			"password":      password,
-			"refresh_token": refreshToken,
+			"refresh_token": session.RefreshToken,
 		})
-		sessionJson := gjson.New(sessionVar)
-		accessToken := sessionJson.Get("accessToken").String()
-		if accessToken == "" {
-			g.Log().Error(ctx, "AddAllSession", email, "get session error", sessionJson)
-			detail := sessionJson.Get("detail").String()
-			if detail == "密码不正确!" || gstr.Contains(detail, "account_deactivated") || gstr.Contains(detail, "mfa_bypass") || gstr.Contains(detail, "两步验证") {
-				g.Log().Error(ctx, "AddAllSession", email, detail)
-				cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
-					"officialSession": sessionJson.String(),
-					"status":          0,
-				})
-			}
+		detail := gjson.New(sessionVar).Get("detail").String()
+		if detail != "" {
+			g.Log().Error(ctx, "RefreshAllSession", email, detail)
+			cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
+				"officialSession": sessionVar,
+				"status":          0,
+			})
 			continue
 		}
-		plan_type := sessionJson.Get("accountCheckInfo.plan_type").String()
-		if plan_type == "plus" || plan_type == "team" {
-			isPlus = 1
-		}
-		if plan_type == "free" {
-			isPlus = 0
-		}
-		status = 1
-		cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
-			"officialSession": sessionJson.String(),
-			"isPlus":          isPlus,
-			"status":          status,
-		})
-
-		if status == 0 {
+		session, err = utility.ParseSession(sessionVar.String())
+		if err != nil {
+			g.Log().Error(ctx, "RefreshAllSession", email, err)
 			continue
 		}
-
 		// 添加到缓存
 		cacheSession := &config.CacheSession{
 			Email:        email,
-			IsPlus:       isPlus,
-			AccessToken:  accessToken,
+			AccessToken:  session.AccessToken,
 			CooldownTime: 0,
-			RefreshToken: refreshToken,
+			RefreshToken: session.RefreshToken,
+			PlanType:     session.PlanType,
 		}
 		err = cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
-
 		if err != nil {
 			g.Log().Error(ctx, "AddAllSession to cache ", email, err)
 			continue
 		}
 		g.Log().Info(ctx, "AddAllSession to cache", email, "success")
-
-		// 添加到set
-		if isPlus == 1 {
+		if session.PlanType == "plus" || session.PlanType == "team" {
 			config.PlusSet.Add(email)
 			config.NormalSet.Remove(email)
 			config.Gpt4oLiteSet.Remove(email)
-
-		} else {
+			config.NormalGptsSet.Remove(email)
+			for _, v := range session.TeamIds {
+				config.PlusSet.Add(email + "|" + v)
+			}
+		}
+		if session.PlanType == "free" {
 			config.NormalSet.Add(email)
 			config.Gpt4oLiteSet.Add(email)
 			config.PlusSet.Remove(email)
-
+			if session.FreeWithGpts {
+				config.NormalGptsSet.Add(email)
+			}
 		}
-		accounts_info := officialSession.Get("accounts_info").String()
-
-		teamIds := utility.GetTeamIdByAccountInfo(ctx, accounts_info)
 		// 关闭个人区记忆
 		g.Client().SetHeaderMap(g.MapStrStr{
-			"Authorization": "Bearer " + accessToken,
+			"Authorization": "Bearer " + session.AccessToken,
 			"Content-Type":  "application/json",
 		}).PatchVar(ctx, config.CHATPROXY+"/backend-api/settings/account_user_setting?feature=sunshine&value=false", g.Map{})
-		for _, v := range teamIds {
+		for _, v := range session.TeamIds {
 			config.PlusSet.Add(email + "|" + v)
 			// 关闭团队区记忆
 			g.Client().SetHeaderMap(g.MapStrStr{
-				"Authorization":      "Bearer " + accessToken,
+				"Authorization":      "Bearer " + session.AccessToken,
 				"Content-Type":       "application/json",
 				"Chatgpt-Account-Id": v,
 			}).PatchVar(ctx, config.CHATPROXY+"/backend-api/settings/account_user_setting?feature=sunshine&value=false", g.Map{})
 		}
 	}
 
-	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size())
+	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size(), "NormalGptsSet", config.NormalGptsSet.Size())
 }
