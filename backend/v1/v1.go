@@ -15,6 +15,7 @@ func init() {
 	v1Group.POST("/chat/gpt4v", chat.Gpt4v)
 	v1Group.POST("/chat/gpt4v-mobile", chat.Gpt4v)
 	v1Group.GET("/models", Models)
+	v1Group.POST("/audio/speech", AudioSpeech)
 
 }
 

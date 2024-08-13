@@ -16,7 +16,7 @@ import (
 func init() {
 	ctx := gctx.GetInitCtx()
 	go AddAllSession(ctx)
-	go RefreshAllSession(ctx)
+	// go RefreshAllSession(ctx)
 	corn, err := gcron.AddSingleton(ctx, config.CRONINTERVAL(ctx), RefreshAllSession, "RefreshSession")
 	if err != nil {
 		panic(err)
