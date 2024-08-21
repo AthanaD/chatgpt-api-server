@@ -24,3 +24,5 @@ USERTOKENLOCK: true
 # 3.5模型是否免费
 ISFREE: true
 ```
+## 交流群
+![交流群](https://xyhelper.cn/xyhelper-kf-2-0828.png)
