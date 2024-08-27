@@ -17,6 +17,10 @@ func init() {
 	v1Group.GET("/models", Models)
 	v1Group.POST("/audio/speech", AudioSpeech)
 
+	mainGroup := s.Group("/")
+	mainGroup.Middleware(MiddlewareCORS)
+	mainGroup.GET("/models", Models)
+
 }
 
 func MiddlewareCORS(r *ghttp.Request) {

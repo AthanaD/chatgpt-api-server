@@ -61,3 +61,5 @@ OAIKEY: ""
 
 # 保留历史聊天记录 默认为false
 KEEP_CHAT_HISTORY: true
+
+DEVMODE: true

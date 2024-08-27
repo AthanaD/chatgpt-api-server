@@ -51,8 +51,22 @@ services:
     image: yidadaa/chatgpt-next-web
     restart: always
     environment:
-      OPENAI_API_KEY: "sk-9FXGokN3FlIhIBPK48Ba0041Ad164c0f93A9B7A3668990C7"
+      OPENAI_API_KEY: "sk-xyhelper"
       CODE: "xyhelper"
       BASE_URL: "http://172.18.0.1:3000"
     ports:
       - 3001:3000
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: always
+    network_mode: host
+    environment:
+      PORT: 4000
+      OPENAI_API_KEY: "xyhelper"
+      OPENAI_API_BASE_URL: "http://127.0.0.1:8001/v1"
+
+    volumes:
+      - ./data/open-webui:/app/backend/data
+    # ports:
+    #   - 3000:8080

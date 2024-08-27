@@ -1,11 +1,9 @@
 package utility
 
 import (
-	"errors"
-	"time"
-
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gogf/gf/v2/encoding/gjson"
+	"github.com/gogf/gf/v2/errors/gerror"
 )
 
 func parseJWTWithoutValidation(tokenString string) (jwt.MapClaims, error) {
@@ -28,10 +26,18 @@ func CheckAccessToken(tokenString string) error {
 
 		return err
 	}
-	// 验证是否过期
-	if !claims.VerifyExpiresAt(time.Now().Unix(), true) {
-		return errors.New("token is expired")
+	tokenJson := gjson.New(claims["https://api.openai.com/profile"])
+	// tokenJson.Dump()
+	email := tokenJson.Get("email").String()
+	if email == "" {
+		return gerror.New("Invalid token")
 	}
+	// 验证是否过期
+	// err = claims.Valid()
+	// if err != nil {
+	// 	return err
+	// }
+
 	return nil
 }
 
@@ -44,9 +50,14 @@ func ParserAccessToken(tokenString string) (email string, err error) {
 	tokenJson := gjson.New(claims["https://api.openai.com/profile"])
 	// tokenJson.Dump()
 	email = tokenJson.Get("email").String()
-	// 验证是否过期
-	if !claims.VerifyExpiresAt(time.Now().Unix(), true) {
-		return email, errors.New("token is expired")
+	// g.Dump(claims)
+	if email == "" {
+		return email, gerror.New("Invalid token")
 	}
+
+	// // 验证是否过期
+	// if !claims.Valid() {
+	// 	return email, errors.New("token is expired")
+	// }
 	return email, nil
 }

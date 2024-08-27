@@ -49,19 +49,25 @@ func Models(r *ghttp.Request) {
 	}
 	modelMap := gconv.MapStrStr(gjson.New(modelMapStr))
 	models := make([]OpenAIModel, 0)
+	haveGizmo := false
 	for key, _ := range modelMap {
 		models = append(models, OpenAIModel{
 			ID:      key,
 			Object:  "model",
 			Created: gtime.Now().Timestamp(),
 		})
+		if key == "gpt-4-gizmo-*" {
+			haveGizmo = true
+		}
 	}
-	models = append(models, OpenAIModel{
-		ID:      "gpt-4-gizmo-*",
-		Object:  "model",
-		Created: gtime.Now().Timestamp(),
-	})
-
+	if !haveGizmo {
+		models = append(models, OpenAIModel{
+			ID:      "gpt-4-gizmo-*",
+			Object:  "model",
+			Created: gtime.Now().Timestamp(),
+		})
+	}
+	r.Response.Header().Set("Content-Type", "application/json")
 	r.Response.WriteJsonExit(OpenAIModelsResponse{
 		Data:    models,
 		Success: true,

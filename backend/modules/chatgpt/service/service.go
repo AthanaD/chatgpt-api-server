@@ -15,7 +15,13 @@ import (
 
 func init() {
 	ctx := gctx.GetInitCtx()
-	go AddAllSession(ctx)
+	go func() {
+		AddAllSession(ctx)
+		if !g.Cfg().MustGetWithEnv(ctx, "DEVMODE1").Bool() {
+			RefreshAllSession(ctx)
+		}
+	}()
+
 	// go RefreshAllSession(ctx)
 	corn, err := gcron.AddSingleton(ctx, config.CRONINTERVAL(ctx), RefreshAllSession, "RefreshSession")
 	if err != nil {
@@ -117,18 +123,24 @@ func RefreshAllSession(ctx g.Ctx) {
 			"password":      password,
 			"refresh_token": session.RefreshToken,
 		})
-		detail := gjson.New(sessionVar).Get("detail").String()
-		if detail != "" {
-			g.Log().Error(ctx, "RefreshAllSession", email, detail)
-			cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
-				"officialSession": sessionVar,
-				"status":          0,
-			})
-			continue
-		}
+		// detail := gjson.New(sessionVar).Get("detail").String()
+		// if detail != "" {
+		// 	g.Log().Error(ctx, "RefreshAllSession", email, detail)
+		// 	cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
+		// 		"officialSession": sessionVar,
+		// 		"status":          0,
+		// 	})
+		// 	continue
+		// }
 		session, err = utility.ParseSession(sessionVar.String())
 		if err != nil {
 			g.Log().Error(ctx, "RefreshAllSession", email, err)
+			if session.Disabled {
+				cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
+					"officialSession": sessionVar,
+					"status":          0,
+				})
+			}
 			continue
 		}
 		// 添加到缓存
@@ -141,10 +153,10 @@ func RefreshAllSession(ctx g.Ctx) {
 		}
 		err = cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
 		if err != nil {
-			g.Log().Error(ctx, "AddAllSession to cache ", email, err)
+			g.Log().Error(ctx, "AddSession to cache ", email, err)
 			continue
 		}
-		g.Log().Info(ctx, "AddAllSession to cache", email, "success")
+		g.Log().Info(ctx, "AddSession to cache", email, "success")
 		if session.PlanType == "plus" || session.PlanType == "team" {
 			config.PlusSet.Add(email)
 			config.NormalSet.Remove(email)
@@ -176,6 +188,10 @@ func RefreshAllSession(ctx g.Ctx) {
 				"Chatgpt-Account-Id": v,
 			}).PatchVar(ctx, config.CHATPROXY+"/backend-api/settings/account_user_setting?feature=sunshine&value=false", g.Map{})
 		}
+		cool.DBM(model.NewChatgptSession()).Where("email=?", email).Update(g.Map{
+			"officialSession": sessionVar,
+			"status":          1,
+		})
 	}
 
 	g.Log().Info(ctx, "RefreshAllSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size(), "Gpt4oLiteSet", config.Gpt4oLiteSet.Size(), "NormalGptsSet", config.NormalGptsSet.Size())

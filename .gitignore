@@ -1,1 +1,5 @@
 backend/resource/public/xyhelper/
+node_modules/
+docs/.vuepress/.temp/
+docs/.vuepress/dist/
+docs/.vuepress/.cache/

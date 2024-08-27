@@ -85,7 +85,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	// g.DumpJson(req)
+	g.DumpJson(req)
 	reqModel := req.Model
 	gizmoId := ""
 	if gstr.HasPrefix(reqModel, "gpt-4-gizmo-") {
@@ -366,7 +366,6 @@ func Completions(r *ghttp.Request) {
 			"status":          0, // token过期
 			"officialSession": "token过期,需要重新获取token",
 		})
-		isReturn = false
 		go backendapi.RefreshSession(email)
 		// r.Response.WriteStatus(401, resp.ReadAllString())
 		r.Response.Status = 500
