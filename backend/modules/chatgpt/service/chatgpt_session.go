@@ -79,7 +79,7 @@ func (s *ChatgptSessionService) ModifyAfter(ctx g.Ctx, method string, param map[
 	refreshToken := officialSession.Get("refresh_token").String()
 
 	// 如果没有officialSession，就去获取
-	err = s.GetSessionAndUpdateStatus(ctx, param, refreshToken)
+	s.GetSessionAndUpdateStatus(ctx, param, refreshToken)
 	return
 }
 

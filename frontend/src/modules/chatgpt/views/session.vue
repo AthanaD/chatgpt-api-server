@@ -33,13 +33,13 @@
 		<!-- 新增、编辑 -->
 		<cl-upsert ref="Upsert" />
 	</cl-crud>
-	<f-k-arkos
+	<!-- <f-k-arkos
 		:public-key="publicKey"
 		mode="lightbox"
 		arkosUrl=""
 		@onCompleted="onCompleted($event)"
 		@onError="onError($event)"
-	/>
+	/> -->
 	<cl-dialog title="添加账号" v-model="DialogData['addAccountsVisible']">
 		<div>
 			<el-input
@@ -115,40 +115,40 @@ const Upsert = useUpsert({
 		// }
 		localStorage.removeItem("arkoseToken");
 
-		if (!data.officialSession) {
-			ElMessage({
-				message: "请稍等,人机验证进行中.",
-				type: "warning"
-			});
-			window.myEnforcement.run();
-		}
-	},
-	onSubmit(data, { done, close, next }) {
-		let arkoseToken = localStorage.getItem("arkoseToken");
-		let w = window;
-		if (arkoseToken) {
-			localStorage.removeItem("arkoseToken");
-
-			next({ ...data, arkoseToken });
-			done();
-			close();
-		} else {
-			if (!data.officialSession) {
-				w.myEnforcement.run();
-				ElMessage({
-					message: "请稍等,人机验证进行中,验证完成后请重新点击确定保存.",
-					type: "warning"
-				});
-				// alert("请先完成人机验证");
-
-				done();
-			} else {
-				next(data);
-				done();
-				close();
-			}
-		}
+		// if (!data.officialSession) {
+		// 	ElMessage({
+		// 		message: "请稍等,人机验证进行中.",
+		// 		type: "warning"
+		// 	});
+		// 	window.myEnforcement.run();
+		// }
 	}
+	// onSubmit(data, { done, close, next }) {
+	// let arkoseToken = localStorage.getItem("arkoseToken");
+	// let w = window;
+	// if (arkoseToken) {
+	// 	localStorage.removeItem("arkoseToken");
+
+	// 	next({ ...data, arkoseToken });
+	// 	done();
+	// 	close();
+	// } else {
+	// 	if (!data.officialSession) {
+	// 		w.myEnforcement.run();
+	// 		ElMessage({
+	// 			message: "请稍等,人机验证进行中,验证完成后请重新点击确定保存.",
+	// 			type: "warning"
+	// 		});
+	// 		// alert("请先完成人机验证");
+
+	// 		done();
+	// 	} else {
+	// 		next(data);
+	// 		done();
+	// 		close();
+	// 	}
+	// }
+	// }
 });
 
 // cl-table 配置
@@ -190,14 +190,14 @@ import "xterm/css/xterm.css";
 
 const { service } = useCool();
 
-import FKArkos from "./FKArkos.vue";
+// import FKArkos from "./FKArkos.vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { defineComponent } from "vue";
 export default defineComponent({
-	components: {
-		FKArkos
-	},
+	// components: {
+	// 	FKArkos
+	// },
 	data() {
 		return {
 			// publicKey: process.env.VUE_APP_ARKOSE_PUBLIC_KEY,

@@ -29,3 +29,4 @@ docker compose exec mysql sh -c 'exec mysqldump cool -uroot -p"$MYSQL_ROOT_PASSW
 
 # 删除7天前的备份文件
 # find $BACKUP_DIR -mtime +7 -name "*.sql" -exec rm {} \; 
+
