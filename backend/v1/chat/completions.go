@@ -85,7 +85,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.DumpJson(req)
+	// g.DumpJson(req)
 	reqModel := req.Model
 	gizmoId := ""
 	if gstr.HasPrefix(reqModel, "gpt-4-gizmo-") {
@@ -145,7 +145,7 @@ func Completions(r *ghttp.Request) {
 							"isPlus": 0,
 						})
 						// 从set中删除
-						config.PlusSet.Remove(emailWithTeamId)
+						safeQueue.Remove(emailWithTeamId)
 						// 添加到set
 						config.NormalSet.Add(email)
 						g.Log().Info(ctx, "PLUS失效归还", email, "添加到NormalSet")
@@ -153,40 +153,46 @@ func Completions(r *ghttp.Request) {
 					}
 					if clears_in > 0 {
 						// 延迟归还
-						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", emailWithTeamId, "到PlusSet")
+						g.Log().Info(ctx, "延迟"+gconv.String(clears_in)+"秒归还", emailWithTeamId, safeQueue.Name)
 
 						time.Sleep(time.Duration(clears_in) * time.Second)
 
 					}
-					config.PlusSet.Add(emailWithTeamId)
-					g.Log().Info(ctx, "归还", emailWithTeamId, "到PlusSet")
+					safeQueue.Add(emailWithTeamId)
+					g.Log().Info(ctx, "归还", emailWithTeamId, safeQueue.Name)
 				}
 			}()
 		}()
-		if email == "" {
-			emailWithTeamId, ok = config.PlusSet.Pop()
-			// g.Log().Info(ctx, emailWithTeamId, ok)
-			if !ok {
-				g.Log().Error(ctx, "Get email from plusset error")
-				r.Response.Status = 429
-				r.Response.WriteJson(g.Map{
-					"error": g.Map{
-						"message": "Server is busy, please try again later",
-						"type":    "invalid_request_error",
-						"param":   "plusset",
-						"code":    "server_busy",
-					},
-				})
-				return
-			}
-			if gstr.Contains(emailWithTeamId, "|") {
-				emailWithTeamIdArr := gstr.Split(emailWithTeamId, "|")
-				email = emailWithTeamIdArr[0]
-				teamId = emailWithTeamIdArr[1]
-			} else {
-				email = emailWithTeamId
-			}
+		if mapModel == "o1-preview" {
+			safeQueue = config.O1previewSet
+		} else if mapModel == "o1-mini" {
+			safeQueue = config.O1MiniSet
+		} else {
+			safeQueue = config.PlusSet
 		}
+		emailWithTeamId, ok = safeQueue.Pop()
+		// g.Log().Info(ctx, emailWithTeamId, ok)
+		if !ok {
+			g.Log().Error(ctx, "Get email from plusset error")
+			r.Response.Status = 429
+			r.Response.WriteJson(g.Map{
+				"error": g.Map{
+					"message": "Server is busy, please try again later",
+					"type":    "invalid_request_error",
+					"param":   "plusset",
+					"code":    "server_busy",
+				},
+			})
+			return
+		}
+		if gstr.Contains(emailWithTeamId, "|") {
+			emailWithTeamIdArr := gstr.Split(emailWithTeamId, "|")
+			email = emailWithTeamIdArr[0]
+			teamId = emailWithTeamIdArr[1]
+		} else {
+			email = emailWithTeamId
+		}
+
 	} else if mapModel == "gpt-4o-lite" {
 		if gizmoId != "" {
 			safeQueue = config.NormalGptsSet
@@ -288,7 +294,7 @@ func Completions(r *ghttp.Request) {
 		})
 		return
 	}
-	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, gizmoId, "发起会话", "isStream:", isStream, "keepChatHisory:", config.KEEP_CHAT_HISTORY, "max_tokens:", req.MaxTokens, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size(), "NormalGptsPool:", config.NormalGptsSet.Size())
+	g.Log().Info(ctx, userToken, "使用", emailWithTeamId, reqModel, "->", realModel, gizmoId, "发起会话", "isStream:", isStream, "keepChatHisory:", config.KEEP_CHAT_HISTORY, "max_tokens:", req.MaxTokens, "plusPool:", config.PlusSet.Size(), "normalPool:", config.NormalSet.Size(), "Gpt4oLitePool:", config.Gpt4oLiteSet.Size(), "NormalGptsPool:", config.NormalGptsSet.Size(), "O1PreviewPool:", config.O1previewSet.Size(), "O1MiniPool:", config.O1MiniSet.Size())
 	// OPENAI Moderation 检测
 	if config.OAIKEY != "" {
 		// 检测是否包含违规内容

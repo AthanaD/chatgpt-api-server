@@ -64,23 +64,8 @@ func AddAllSession(ctx g.Ctx) {
 			continue
 		}
 		g.Log().Info(ctx, "AddAllSession to cache", email, "success")
-		if session.PlanType == "plus" || session.PlanType == "team" {
-			config.PlusSet.Add(email)
-			config.NormalSet.Remove(email)
-			config.Gpt4oLiteSet.Remove(email)
-			config.NormalGptsSet.Remove(email)
-			for _, v := range session.TeamIds {
-				config.PlusSet.Add(email + "|" + v)
-			}
-		}
-		if session.PlanType == "free" {
-			config.NormalSet.Add(email)
-			config.Gpt4oLiteSet.Add(email)
-			config.PlusSet.Remove(email)
-			if session.FreeWithGpts {
-				config.NormalGptsSet.Add(email)
-			}
-		}
+		// 调整session队列
+		config.RefreshQueueSession(ctx, session)
 
 	}
 
@@ -157,23 +142,10 @@ func RefreshAllSession(ctx g.Ctx) {
 			continue
 		}
 		g.Log().Info(ctx, "AddSession to cache", email, "success")
-		if session.PlanType == "plus" || session.PlanType == "team" {
-			config.PlusSet.Add(email)
-			config.NormalSet.Remove(email)
-			config.Gpt4oLiteSet.Remove(email)
-			config.NormalGptsSet.Remove(email)
-			for _, v := range session.TeamIds {
-				config.PlusSet.Add(email + "|" + v)
-			}
-		}
-		if session.PlanType == "free" {
-			config.NormalSet.Add(email)
-			config.Gpt4oLiteSet.Add(email)
-			config.PlusSet.Remove(email)
-			if session.FreeWithGpts {
-				config.NormalGptsSet.Add(email)
-			}
-		}
+
+		// 调整session队列
+		config.RefreshQueueSession(ctx, session)
+
 		// 关闭个人区记忆
 		g.Client().SetHeaderMap(g.MapStrStr{
 			"Authorization": "Bearer " + session.AccessToken,

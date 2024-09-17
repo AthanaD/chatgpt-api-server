@@ -37,6 +37,8 @@ var (
 	Gpt4oLiteSet              = utility.NewSafeQueue("Gpt4oLiteSet")
 	NormalGptsSet             = utility.NewSafeQueue("NormalGptsSet")
 	Gpt_4o_Set                = utility.NewSafeQueue("Gpt_4o_Set")
+	O1previewSet              = utility.NewSafeQueue("O1previewSet")
+	O1MiniSet                 = utility.NewSafeQueue("O1MiniSet")
 	MAXTIME                   = 0
 	TraceparentCache          = gcache.New()
 	CHATPROXY                 = ""
@@ -115,6 +117,9 @@ func init() {
 	PlusModels.Append("gpt-4-dalle")
 	PlusModels.Append("gpt-4-code-interpreter")
 	PlusModels.Append("gpt-4-gizmo")
+	PlusModels.Append("gpt-4-gizmo-lite")
+	PlusModels.Append("o1-preview")
+	PlusModels.Append("o1-mini")
 
 	chatproxy := g.Cfg().MustGetWithEnv(ctx, "CHATPROXY").String()
 	if chatproxy != "" {
@@ -218,4 +223,33 @@ func GetTodayLefeSecond(ctx g.Ctx) int64 {
 	tomorrow := time.Date(year, month, day+1, 0, 0, 0, 0, now.Location())
 	// 获取当前时间到明天的时间差
 	return tomorrow.Unix() - now.Unix()
+}
+
+// RefreshQueueSession 刷新队列中的session
+func RefreshQueueSession(ctx g.Ctx, session *utility.Session) {
+	email := session.Email
+	if session.PlanType == "plus" || session.PlanType == "team" {
+		PlusSet.Add(email)
+		O1MiniSet.Add(email)
+		O1previewSet.Add(email)
+		NormalSet.Remove(email)
+		Gpt4oLiteSet.Remove(email)
+		NormalGptsSet.Remove(email)
+		for _, v := range session.TeamIds {
+			PlusSet.Add(email + "|" + v)
+			O1MiniSet.Add(email + "|" + v)
+			O1previewSet.Add(email + "|" + v)
+		}
+	}
+	if session.PlanType == "free" {
+		NormalSet.Add(email)
+		Gpt4oLiteSet.Add(email)
+		PlusSet.Remove(email)
+		O1MiniSet.Remove(email)
+		O1previewSet.Remove(email)
+		if session.FreeWithGpts {
+			NormalGptsSet.Add(email)
+		}
+	}
+	g.Log().Info(ctx, "RefreshQueueSession", email, "PlusSet", PlusSet.Size(), "NormalSet", NormalSet.Size(), "Gpt4oLiteSet", Gpt4oLiteSet.Size(), "NormalGptsSet", NormalGptsSet.Size(), "O1MiniSet", O1MiniSet.Size(), "O1previewSet", O1previewSet.Size())
 }

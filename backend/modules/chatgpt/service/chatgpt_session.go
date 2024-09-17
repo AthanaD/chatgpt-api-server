@@ -173,23 +173,8 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 		PlanType:     session.PlanType,
 	}
 	cool.CacheManager.Set(ctx, "session:"+email, cacheSession, time.Hour*24*10)
-	if session.PlanType == "plus" || session.PlanType == "team" {
-		config.PlusSet.Add(email)
-		config.NormalSet.Remove(email)
-		config.Gpt4oLiteSet.Remove(email)
-		config.NormalGptsSet.Remove(email)
-		for _, v := range session.TeamIds {
-			config.PlusSet.Add(email + "|" + v)
-		}
-	}
-	if session.PlanType == "free" {
-		config.NormalSet.Add(email)
-		config.Gpt4oLiteSet.Add(email)
-		config.PlusSet.Remove(email)
-		if session.FreeWithGpts {
-			config.NormalGptsSet.Add(email)
-		}
-	}
+	config.RefreshQueueSession(ctx, session)
+
 	g.Log().Info(ctx, "AddSession finish", "plusSet", config.PlusSet.Size(), "normalSet", config.NormalSet.Size())
 	return nil
 }

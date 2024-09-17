@@ -1,0 +1,32 @@
+# 普通用户
+POST http://127.0.0.1:8001/v1/chat/completions HTTP/1.1
+Content-Type: application/application/json
+Authorization: Bearer normaluser
+
+{
+    "model": "o1-preview",
+    "messages": [
+        {
+            "role": "user",
+            "content": "如何使用这个模型？"
+        }
+    ],
+    "stream": true
+}
+
+
+# PLUS用户
+POST http://127.0.0.1:8001/v1/chat/completions HTTP/1.1
+Content-Type: application/application/json
+Authorization: Bearer plususer
+
+{
+    "model": "o1-preview",
+    "messages": [
+        {
+            "role": "user",
+            "content": "如何使用这个模型？"
+        }
+    ],
+    "stream": true
+}
