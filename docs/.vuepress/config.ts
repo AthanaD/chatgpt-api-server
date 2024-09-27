@@ -12,6 +12,7 @@ export default defineUserConfig({
           children: [
             '/guide/README.md',
             '/guide/modelmap.md',
+            '/guide/addaccount.md',
           ],
         },
       ]

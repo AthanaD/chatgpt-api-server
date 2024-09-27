@@ -25,8 +25,9 @@ type AddBulkReq struct {
 	Accounts      string `jv:"required#账号密码不能为空" json:"accounts" in:"body"`
 }
 type Account struct {
-	Username string `json:"username" v:"required"`
-	Password string `json:"password" v:"required"`
+	Username     string `json:"username" v:"required"`
+	Password     string `json:"password" v:"required"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func (c *ChatgptSessionController) AddBulk(ctx context.Context, req *AddBulkReq) (res *cool.BaseRes, err error) {
@@ -37,7 +38,7 @@ func (c *ChatgptSessionController) AddBulk(ctx context.Context, req *AddBulkReq)
 	Accounts := make([]Account, 0)
 	for _, v := range accounts {
 		av := gstr.SplitAndTrim(v, ",")
-		if len(av) >= 2 {
+		if len(av) == 2 {
 			account := Account{Username: gstr.ToLower(av[0]), Password: av[1]}
 			if err := g.Validator().Data(account).Run(ctx); err != nil {
 				fmt.Print(gstr.Join(err.Strings(), "\n"))
@@ -46,6 +47,15 @@ func (c *ChatgptSessionController) AddBulk(ctx context.Context, req *AddBulkReq)
 				return res, err
 			}
 
+			Accounts = append(Accounts, account)
+		} else if len(av) == 3 {
+			account := Account{Username: gstr.ToLower(av[0]), Password: av[1], RefreshToken: av[2]}
+			if err := g.Validator().Data(account).Run(ctx); err != nil {
+				fmt.Print(gstr.Join(err.Strings(), "\n"))
+				// res = cool.Fail(gstr.Join(err.Strings(), "\n"))
+
+				return res, err
+			}
 			Accounts = append(Accounts, account)
 		} else {
 			g.Log().Error(ctx, v+"|格式错误")
@@ -72,7 +82,7 @@ func (c *ChatgptSessionController) AddBulk(ctx context.Context, req *AddBulkReq)
 		ctxid := gctx.CtxId(ctx)
 
 		for _, account := range Accounts {
-			err = service.NewChatgptSessionService().AddSession(ctx, account.Username, account.Password)
+			err = service.NewChatgptSessionService().AddSession(ctx, account.Username, account.Password, account.RefreshToken)
 			if err != nil {
 				countFail++
 				g.Log().Error(ctx, account.Username, "添加失败", err)

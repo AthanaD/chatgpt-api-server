@@ -84,7 +84,7 @@ func (s *ChatgptSessionService) ModifyAfter(ctx g.Ctx, method string, param map[
 }
 
 // AddSession 获取session并更新状态
-func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string) error {
+func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password, refreshToken string) error {
 	ctxid := gctx.CtxId(ctx)
 	// 先检查是否已经存在
 	count, err := cool.DBM(s.Model).Where("email=?", username).Count()
@@ -96,10 +96,14 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 	}
 	// g.Log().Info(ctx, "AddSession", "username", username, "password", password)
 	loginurl := config.CHATPROXY + "/applelogin"
-	// g.Log().Debug(ctx, "ChatgptSessionService.AddSession", loginurl)
+	if refreshToken != "" {
+		loginurl = config.CHATPROXY + "/auth/refresh"
+	}
+	g.Log().Debug(ctx, "ChatgptSessionService.AddSession", loginurl)
 	sessionVar := g.Client().PostVar(ctx, loginurl, g.Map{
-		"username": username,
-		"password": password,
+		"username":      username,
+		"password":      password,
+		"refresh_token": refreshToken,
 	})
 	sessionJson := gjson.New(sessionVar)
 	// g.Dump(sessionVar)
@@ -181,6 +185,10 @@ func (s *ChatgptSessionService) AddSession(ctx g.Ctx, username, password string)
 
 func (s *ChatgptSessionService) GetSessionAndUpdateStatus(ctx g.Ctx, param g.Map, refreshToken string) error {
 	getSessionUrl := config.CHATPROXY + "/applelogin"
+	if refreshToken != "" {
+		getSessionUrl = config.CHATPROXY + "/auth/refresh"
+	}
+	g.Log().Debug(ctx, "ChatgptSessionService.GetSessionAndUpdateStatus", getSessionUrl, param, refreshToken)
 	sessionVar := g.Client().SetHeader("authkey", config.AUTHKEY(ctx)).SetCookie("arkoseToken", gconv.String(param["arkoseToken"])).PostVar(ctx, getSessionUrl, g.Map{
 		"username":      param["email"],
 		"password":      param["password"],
